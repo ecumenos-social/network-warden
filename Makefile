@@ -1,4 +1,4 @@
-export GOPRIVATE=github.com/ecumenos
+export GOPRIVATE=github.com/ecumenos-social
 export SHELL=/bin/sh
 
 .PHONY: all
