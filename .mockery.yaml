@@ -1,0 +1,8 @@
+with-expecter: True
+inpackage: False
+dir: "{{.InterfaceDir}}"
+mockname: "Mock{{.InterfaceName}}"
+outpkg: "mocks"
+filename: "./mocks/{{.InterfaceName}}.go"
+all: True
+log-level: "error"
