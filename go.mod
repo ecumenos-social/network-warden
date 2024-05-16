@@ -1,3 +1,3 @@
-module github.com/ecumenos-social/zookeeper
+module github.com/ecumenos-social/network-warden
 
 go 1.21.5
