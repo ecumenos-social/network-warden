@@ -2,7 +2,7 @@ export GOPRIVATE=github.com/ecumenos-social
 export SHELL=/bin/sh
 
 .PHONY: all
-all: hooks submodules tidy check fmt lint test tidy
+all: hooks tidy check fmt lint test tidy
 
 .PHONY: hooks
 hooks: ## Git hooks
@@ -38,11 +38,10 @@ check: ## Compile everything, checking syntax (does not output binaries)
 .env:
 	if [ ! -f ".env" ]; then cp example.dev.env .env; fi
 
-
-.PHONY: submodules
-submodules:
-	git submodule foreach git pull origin main
-
 .PHONY: run-nw
 run-nw: .env
 	go run cmd/network-warden/*.go run
+
+.PHONY: run-admin
+run-admin: .env
+	go run cmd/admin/*.go run

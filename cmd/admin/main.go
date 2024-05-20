@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ecumenos-social/network-warden/cmd/network-warden-admin/configurations"
+	"github.com/ecumenos-social/network-warden/cmd/admin/configurations"
 	cli "github.com/urfave/cli/v2"
 )
 
@@ -18,7 +18,7 @@ func main() {
 func run(args []string) error {
 	app := cli.App{
 		Name:    configurations.ServiceName,
-		Usage:   "admin service for managing networks service",
+		Usage:   "administration of network warden",
 		Version: string(configurations.ServiceVersion),
 		Flags:   []cli.Flag{},
 		Commands: []*cli.Command{
