@@ -3,7 +3,7 @@ module github.com/ecumenos-social/network-warden
 go 1.21.5
 
 require (
-	github.com/ecumenos-social/schemas v0.0.3
+	github.com/ecumenos-social/schemas v0.0.4
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0
