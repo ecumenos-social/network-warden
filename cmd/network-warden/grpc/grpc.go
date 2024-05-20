@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ecumenos-social/network-warden/pkg/grpcutils"
-	"github.com/ecumenos-social/network-warden/pkg/toolkitfx"
-	"github.com/ecumenos-social/network-warden/pkg/toolkitfx/fxgrpc"
+	grpcutils "github.com/ecumenos-social/grpc-utils"
 	pbv1 "github.com/ecumenos-social/schemas/proto/gen/networkwarden/v1"
+	"github.com/ecumenos-social/toolkitfx"
+	"github.com/ecumenos-social/toolkitfx/fxgrpc"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/heptiolabs/healthcheck"
 	"go.uber.org/fx"
