@@ -3,10 +3,10 @@ package main
 import (
 	"github.com/ecumenos-social/network-warden/cmd/network-warden/configurations"
 	"github.com/ecumenos-social/network-warden/cmd/network-warden/grpc"
-	"github.com/ecumenos-social/network-warden/pkg/toolkitfx"
-	"github.com/ecumenos-social/network-warden/pkg/toolkitfx/fxenvironment"
-	"github.com/ecumenos-social/network-warden/pkg/toolkitfx/fxgrpc"
-	"github.com/ecumenos-social/network-warden/pkg/toolkitfx/fxlogger"
+	"github.com/ecumenos-social/toolkitfx"
+	"github.com/ecumenos-social/toolkitfx/fxenvironment"
+	"github.com/ecumenos-social/toolkitfx/fxgrpc"
+	"github.com/ecumenos-social/toolkitfx/fxlogger"
 	"go.uber.org/fx"
 )
 
