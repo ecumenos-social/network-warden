@@ -42,3 +42,7 @@ check: ## Compile everything, checking syntax (does not output binaries)
 .PHONY: submodules
 submodules:
 	git submodule foreach git pull origin main
+
+.PHONY: run-nw
+run-nw: .env
+	go run cmd/network-warden/*.go run
