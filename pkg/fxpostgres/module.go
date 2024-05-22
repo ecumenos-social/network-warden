@@ -9,8 +9,8 @@ import (
 )
 
 type Config struct {
-	URL            string `json:"url"`
-	MigrationsPath string `json:"migrationsPath"`
+	URL            string `split_words:"true"`
+	MigrationsPath string `split_words:"true"`
 }
 
 var Module = fx.Options(
@@ -31,6 +31,7 @@ var Module = fx.Options(
 
 		return driver, nil
 	}),
+	fx.Provide(NewMigrationsRunner),
 )
 
 type Driver interface {
