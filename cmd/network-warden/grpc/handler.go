@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 
+	"github.com/ecumenos-social/network-warden/services/holders"
 	pbv1 "github.com/ecumenos-social/schemas/proto/gen/networkwarden/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -10,12 +11,14 @@ import (
 
 type Handler struct {
 	pbv1.NetworkWardenServiceServer
+
+	hs holders.Service
 }
 
 var _ pbv1.NetworkWardenServiceServer = (*Handler)(nil)
 
-func NewHandler() *Handler {
-	return &Handler{}
+func NewHandler(hs holders.Service) *Handler {
+	return &Handler{hs: hs}
 }
 
 func (h *Handler) RegisterHolder(context.Context, *pbv1.RegisterHolderRequest) (*pbv1.RegisterHolderResponse, error) {

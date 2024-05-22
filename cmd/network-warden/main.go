@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/ecumenos-social/network-warden/cmd/network-warden/configurations"
@@ -12,7 +11,8 @@ import (
 
 func main() {
 	if err := godotenv.Load(".env"); err != nil {
-		log.Fatalf("Error loading .env file")
+		fmt.Println("error loading .env file", "err", err)
+		os.Exit(-1)
 	}
 
 	if err := run(os.Args); err != nil {
