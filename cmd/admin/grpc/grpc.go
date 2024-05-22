@@ -18,26 +18,16 @@ import (
 	"google.golang.org/grpc/keepalive"
 )
 
-type Config struct {
-	GRPC struct {
-		MaxConnectionAge     time.Duration `default:"5m"`
-		KeepAliveEnforcement struct {
-			MinTime             time.Duration `default:"1m"`
-			PermitWithoutStream bool          `default:"true"`
-		}
-	}
-}
-
-func NewGRPCServer(lc fx.Lifecycle, config *Config, grpcConfig *fxgrpc.Config, sn toolkitfx.ServiceName) *fxgrpc.GRPCServer {
+func NewGRPCServer(lc fx.Lifecycle, config *fxgrpc.Config, sn toolkitfx.ServiceName) *fxgrpc.GRPCServer {
 	handler := NewHandler()
 	grpcServer := fxgrpc.GRPCServer{}
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			server := grpcutils.NewServer(string(sn), net.JoinHostPort(grpcConfig.GRPC.Host, grpcConfig.GRPC.Port))
+			server := grpcutils.NewServer(string(sn), net.JoinHostPort(config.GRPC.Host, config.GRPC.Port))
 			server.Init(
 				grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
-					MinTime:             config.GRPC.KeepAliveEnforcement.MinTime,
-					PermitWithoutStream: config.GRPC.KeepAliveEnforcement.PermitWithoutStream,
+					MinTime:             config.GRPC.KeepAliveEnforcementMinTime,
+					PermitWithoutStream: config.GRPC.KeepAliveEnforcementPermitWithoutStream,
 				}),
 				grpcutils.ValidatorServerOption(),
 				grpcutils.RecoveryServerOption(),

@@ -9,13 +9,6 @@ import (
 	"go.uber.org/fx"
 )
 
-type fxConfig struct {
-	fx.Out
-	Logger    *fxlogger.Config
-	Grpc      *fxgrpc.Config
-	GrpcLocal *grpc.Config
-}
-
 var Dependencies = fx.Options(
 	fx.Supply(toolkitfx.ServiceName(configurations.ServiceName)),
 	fxlogger.Module,
