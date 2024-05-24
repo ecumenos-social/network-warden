@@ -31,7 +31,6 @@ var runMigrateUpCmd = &cli.Command{
 		fx.New(
 			configurations.Module(cctx),
 			Dependencies,
-			Invokes,
 			fx.StartTimeout(configurations.StartTimeout),
 			fx.Invoke(func(runner *fxpostgres.MigrationsRunner) error {
 				return runner.MigrateUp()
@@ -50,7 +49,6 @@ var runMigrateDownCmd = &cli.Command{
 		fx.New(
 			configurations.Module(cctx),
 			Dependencies,
-			Invokes,
 			fx.StartTimeout(configurations.StartTimeout),
 			fx.Invoke(func(runner *fxpostgres.MigrationsRunner) error {
 				return runner.MigrateDown()

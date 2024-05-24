@@ -1,10 +1,6 @@
 package fxpostgres
 
 import (
-	"fmt"
-	"os"
-	"strings"
-
 	"github.com/ecumenos-social/network-warden/pkg/postgres"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -19,15 +15,6 @@ type MigrationsRunner struct {
 }
 
 func NewMigrationsRunner(config *Config, logger *zap.Logger, shutdowner fx.Shutdowner) *MigrationsRunner {
-	for _, env := range os.Environ() {
-		// env is
-		envPair := strings.SplitN(env, "=", 2)
-		key := envPair[0]
-		value := envPair[1]
-
-		fmt.Printf("%s : %s\n", key, value)
-	}
-	fmt.Println("@!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", config.URL, config.MigrationsPath)
 	return &MigrationsRunner{
 		url:            config.URL,
 		migrationsPath: config.MigrationsPath,
@@ -39,7 +26,7 @@ func NewMigrationsRunner(config *Config, logger *zap.Logger, shutdowner fx.Shutd
 func (r *MigrationsRunner) MigrateUp() error {
 	fn := postgres.NewMigrateUpFunc()
 	if !r.prod {
-		r.logger.Info("runnning migrate up",
+		r.logger.Info("running migrate up",
 			zap.String("db_url", r.url),
 			zap.String("source_path", r.migrationsPath))
 	}
@@ -49,7 +36,7 @@ func (r *MigrationsRunner) MigrateUp() error {
 func (r *MigrationsRunner) MigrateDown() error {
 	fn := postgres.NewMigrateDownFunc()
 	if !r.prod {
-		r.logger.Info("runnning migrate down",
+		r.logger.Info("running migrate down",
 			zap.String("db_url", r.url),
 			zap.String("source_path", r.migrationsPath))
 	}

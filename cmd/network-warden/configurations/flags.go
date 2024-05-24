@@ -7,6 +7,24 @@ import (
 )
 
 var Flags = []cli.Flag{
+	&cli.StringFlag{
+		Name:    "nw-app-name",
+		Usage:   "it is unique application name",
+		Value:   "name",
+		EnvVars: []string{"NETWORK_WARDEN_APP_NAME"},
+	},
+	&cli.StringFlag{
+		Name:    "nw-app-description",
+		Usage:   "it is application description",
+		Value:   "it is network warden",
+		EnvVars: []string{"NETWORK_WARDEN_APP_DESCRIPTION"},
+	},
+	&cli.Float64Flag{
+		Name:    "nw-app-rate-limit",
+		Usage:   "it is rate limit",
+		Value:   0.1,
+		EnvVars: []string{"NETWORK_WARDEN_APP_RATE_LIMIT"},
+	},
 	&cli.BoolFlag{
 		Name:    "nw-logger-production",
 		Usage:   "make it true if you need logging on production environment",
@@ -96,5 +114,41 @@ var Flags = []cli.Flag{
 		Usage:   "it is path to directory with postgres migrations",
 		Value:   `file://cmd/network-warden/pgmigrations`,
 		EnvVars: []string{"NETWORK_WARDEN_POSTGRES_MIGRATIONS_PATH"},
+	},
+	&cli.Int64Flag{
+		Name:    "nw-id-gen-top-node-id",
+		Usage:   "it is id generator top level node seed",
+		Value:   10,
+		EnvVars: []string{"NETWORK_WARDEN_ID_GENERATOR_TOP_NODE_ID"},
+	},
+	&cli.Int64Flag{
+		Name:    "nw-id-gen-low-node-id",
+		Usage:   "it is id generator low level node seed",
+		Value:   10,
+		EnvVars: []string{"NETWORK_WARDEN_ID_GENERATOR_LOW_NODE_ID"},
+	},
+	&cli.StringFlag{
+		Name:    "nw-auth-jwt-signing-key",
+		Usage:   "it is JWT secret",
+		Value:   "alDFsk1d2!j@G$4%5^B&f*6(7)h_-g+=",
+		EnvVars: []string{"NETWORK_WARDEN_AUTH_JWT_SIGNING_KEY"},
+	},
+	&cli.DurationFlag{
+		Name:    "nw-auth-token-age",
+		Usage:   "it is age of token",
+		Value:   30 * time.Minute,
+		EnvVars: []string{"NETWORK_WARDEN_AUTH_TOKEN_AGE"},
+	},
+	&cli.DurationFlag{
+		Name:    "nw-auth-refresh-token-age",
+		Usage:   "it is age of refresh token",
+		Value:   90 * time.Minute,
+		EnvVars: []string{"NETWORK_WARDEN_AUTH_REFRESH_TOKEN_AGE"},
+	},
+	&cli.DurationFlag{
+		Name:    "nw-holder-session-age",
+		Usage:   "it is age of holder session",
+		Value:   90 * time.Minute,
+		EnvVars: []string{"NETWORK_WARDEN_HOLDER_SESSION_AGE"},
 	},
 }

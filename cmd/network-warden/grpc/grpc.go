@@ -7,7 +7,6 @@ import (
 	"time"
 
 	grpcutils "github.com/ecumenos-social/grpc-utils"
-	"github.com/ecumenos-social/network-warden/services/holders"
 	pbv1 "github.com/ecumenos-social/schemas/proto/gen/networkwarden/v1"
 	"github.com/ecumenos-social/toolkitfx"
 	"github.com/ecumenos-social/toolkitfx/fxgrpc"
@@ -22,14 +21,13 @@ import (
 type grpcServerParams struct {
 	fx.In
 
-	LC             fx.Lifecycle
-	Config         *fxgrpc.Config
-	ServiceName    toolkitfx.ServiceName
-	HoldersService holders.Service
+	LC          fx.Lifecycle
+	Config      *fxgrpc.Config
+	ServiceName toolkitfx.ServiceName
+	Handler     *Handler
 }
 
 func NewGRPCServer(params grpcServerParams) *fxgrpc.GRPCServer {
-	handler := NewHandler(params.HoldersService)
 	grpcServer := fxgrpc.GRPCServer{}
 	params.LC.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
@@ -43,7 +41,7 @@ func NewGRPCServer(params grpcServerParams) *fxgrpc.GRPCServer {
 				grpcutils.RecoveryServerOption(),
 				grpc.KeepaliveParams(keepalive.ServerParameters{MaxConnectionAge: params.Config.GRPC.MaxConnectionAge}),
 			)
-			pbv1.RegisterNetworkWardenServiceServer(server.Server, handler)
+			pbv1.RegisterNetworkWardenServiceServer(server.Server, params.Handler)
 			grpcServer.Server = server
 
 			return nil
