@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/ecumenos-social/network-warden/models"
 	"github.com/ecumenos-social/network-warden/services/auth"
@@ -70,6 +71,26 @@ func (h *Handler) customizeLogger(ctx context.Context, operationName string) *za
 	}
 
 	return l
+}
+
+func (h *Handler) CheckEmails(ctx context.Context, req *pbv1.CheckEmailsRequest) (*pbv1.CheckEmailsResponse, error) {
+	errs := make([]string, 0, len(req.Emails))
+	for _, email := range req.Emails {
+		if err := validators.ValidateEmail(ctx, email); err != nil {
+			errs = append(errs, err.Error())
+		}
+	}
+	if err := h.hs.CheckEmailsUsage(ctx, req.Emails); err != nil {
+		errs = append(errs, err.Error())
+	}
+	var result = "ok"
+	if len(errs) > 0 {
+		result = fmt.Sprintf("errors: %s", strings.Join(errs, ", "))
+	}
+
+	return &pbv1.CheckEmailsResponse{
+		Result: result,
+	}, nil
 }
 
 func (h *Handler) RegisterHolder(ctx context.Context, req *pbv1.RegisterHolderRequest) (*pbv1.RegisterHolderResponse, error) {
