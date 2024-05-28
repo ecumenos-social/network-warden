@@ -18,26 +18,16 @@ import (
 	"google.golang.org/grpc/keepalive"
 )
 
-type Config struct {
-	GRPC struct {
-		MaxConnectionAge     time.Duration `default:"5m"`
-		KeepAliveEnforcement struct {
-			MinTime             time.Duration `default:"1m"`
-			PermitWithoutStream bool          `default:"true"`
-		}
-	}
-}
-
-func NewGRPCServer(lc fx.Lifecycle, config Config, grpcConfig fxgrpc.Config, sn toolkitfx.ServiceName) *fxgrpc.GRPCServer {
+func NewGRPCServer(lc fx.Lifecycle, config *fxgrpc.Config, sn toolkitfx.ServiceName) *fxgrpc.GRPCServer {
 	handler := NewHandler()
 	grpcServer := fxgrpc.GRPCServer{}
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			server := grpcutils.NewServer(string(sn), net.JoinHostPort(grpcConfig.GRPC.Host, grpcConfig.GRPC.Port))
+			server := grpcutils.NewServer(string(sn), net.JoinHostPort(config.GRPC.Host, config.GRPC.Port))
 			server.Init(
 				grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
-					MinTime:             config.GRPC.KeepAliveEnforcement.MinTime,
-					PermitWithoutStream: config.GRPC.KeepAliveEnforcement.PermitWithoutStream,
+					MinTime:             config.GRPC.KeepAliveEnforcementMinTime,
+					PermitWithoutStream: config.GRPC.KeepAliveEnforcementPermitWithoutStream,
 				}),
 				grpcutils.ValidatorServerOption(),
 				grpcutils.RecoveryServerOption(),
@@ -56,27 +46,27 @@ func NewGRPCServer(lc fx.Lifecycle, config Config, grpcConfig fxgrpc.Config, sn 
 	return &grpcServer
 }
 
-func NewGatewayHandler() *fxgrpc.GatewayHandler {
-	return &fxgrpc.GatewayHandler{
+func NewGatewayHandler() *fxgrpc.HTTPGatewayHandler {
+	return &fxgrpc.HTTPGatewayHandler{
 		// TODO: uncomment when endpoints are added
 		// Handler: pbv1.RegisterAdminServiceHandler,
 	}
 }
 
-func NewLivenessGateway() *fxgrpc.LivenessHandler {
+func NewLivenessGateway() *fxgrpc.LivenessGatewayHandler {
 	health := healthcheck.NewHandler()
 	health.AddLivenessCheck("healthcheck", func() error { return nil })
-	return &fxgrpc.LivenessHandler{Handler: health}
+	return &fxgrpc.LivenessGatewayHandler{Handler: health}
 }
 
 func NewHTTPGateway(
 	lc fx.Lifecycle,
 	s fx.Shutdowner,
 	logger *zap.Logger,
-	cfg fxgrpc.Config,
-	g *fxgrpc.GatewayHandler,
+	cfg *fxgrpc.Config,
+	g *fxgrpc.HTTPGatewayHandler,
 ) error {
-	httpAddr := net.JoinHostPort(cfg.HTTP.Host, cfg.HTTP.Port)
+	httpAddr := net.JoinHostPort(cfg.HTTPGateway.Host, cfg.HTTPGateway.Port)
 	mux := runtime.NewServeMux()
 	conn := grpcutils.NewClientConnection(net.JoinHostPort(cfg.GRPC.Host, cfg.GRPC.Port))
 

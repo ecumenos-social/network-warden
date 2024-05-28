@@ -1,0 +1,17 @@
+version: "3.8"
+services:
+  postgres:
+    image: "postgres:14"
+    ports:
+      - "5432:5432"
+    volumes:
+      - db:/var/lib/postgresql/data
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: rootpassword
+      POSTGRES_USER: ecumenosuser
+      POSTGRES_DB: ecumenos_network_warden_db
+
+volumes:
+  db:
+    driver: local

@@ -9,9 +9,10 @@ import (
 var runAppCmd = &cli.Command{
 	Name:  "run",
 	Usage: "running server",
-	Flags: []cli.Flag{},
+	Flags: configurations.Flags,
 	Action: func(cctx *cli.Context) error {
 		fx.New(
+			configurations.Module(cctx),
 			Dependencies,
 			Invokes,
 			fx.StartTimeout(configurations.StartTimeout),

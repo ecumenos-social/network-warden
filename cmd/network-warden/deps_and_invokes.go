@@ -3,37 +3,42 @@ package main
 import (
 	"github.com/ecumenos-social/network-warden/cmd/network-warden/configurations"
 	"github.com/ecumenos-social/network-warden/cmd/network-warden/grpc"
+	"github.com/ecumenos-social/network-warden/cmd/network-warden/repository"
+	"github.com/ecumenos-social/network-warden/pkg/fxpostgres"
+	"github.com/ecumenos-social/network-warden/services/auth"
+	"github.com/ecumenos-social/network-warden/services/emailer"
+	holdersessions "github.com/ecumenos-social/network-warden/services/holder-sessions"
+	"github.com/ecumenos-social/network-warden/services/holders"
+	smssender "github.com/ecumenos-social/network-warden/services/sms-sender"
 	"github.com/ecumenos-social/toolkitfx"
-	"github.com/ecumenos-social/toolkitfx/fxenvironment"
 	"github.com/ecumenos-social/toolkitfx/fxgrpc"
+	"github.com/ecumenos-social/toolkitfx/fxidgenerator"
 	"github.com/ecumenos-social/toolkitfx/fxlogger"
 	"go.uber.org/fx"
 )
 
-type fxConfig struct {
-	fx.Out
-	Logger    fxlogger.Config
-	Grpc      fxgrpc.Config
-	GrpcLocal grpc.Config
-}
-
 var Dependencies = fx.Options(
 	fx.Supply(toolkitfx.ServiceName(configurations.ServiceName)),
 	fxlogger.Module,
-	fxenvironment.Module(&fxConfig{}, false),
-	fx.Provide(func(c fxenvironment.FxConfig) fxConfig {
-		return *c.(*fxConfig)
-	}),
+	fxpostgres.Module,
+	repository.Module,
+	fxidgenerator.Module,
 	fx.Provide(
 		grpc.NewGRPCServer,
-		grpc.NewGatewayHandler,
+		grpc.NewHTTPGatewayHandler,
 		grpc.NewLivenessGateway,
+		grpc.NewHandler,
+		holders.New,
+		holdersessions.New,
+		auth.New,
+		emailer.New,
+		smssender.New,
 	),
 )
 
 var Invokes = fx.Invoke(
-	fxgrpc.NewRegisteredGRPCServer,
-	grpc.NewHTTPGateway,
-	fxgrpc.NewHealthServer,
-	fxgrpc.NewLivenessGateway,
+	fxgrpc.RunRegisteredGRPCServer,
+	grpc.RunHTTPGateway,
+	fxgrpc.RunHealthServer,
+	fxgrpc.RunLivenessGateway,
 )

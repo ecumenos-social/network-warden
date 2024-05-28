@@ -42,6 +42,14 @@ check: ## Compile everything, checking syntax (does not output binaries)
 run-nw: .env
 	go run cmd/network-warden/*.go run
 
+.PHONY: run-nw-migrate-up
+run-nw-migrate-up: .env
+	go run cmd/network-warden/*.go migrate-up
+
+.PHONY: run-nw-migrate-down
+run-nw-migrate-down: .env
+	go run cmd/network-warden/*.go migrate-down
+
 .PHONY: run-admin
 run-admin: .env
 	go run cmd/admin/*.go run

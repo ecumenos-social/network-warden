@@ -18,32 +18,30 @@ import (
 	"google.golang.org/grpc/keepalive"
 )
 
-type Config struct {
-	GRPC struct {
-		MaxConnectionAge     time.Duration `default:"5m"`
-		KeepAliveEnforcement struct {
-			MinTime             time.Duration `default:"1m"`
-			PermitWithoutStream bool          `default:"true"`
-		}
-	}
+type grpcServerParams struct {
+	fx.In
+
+	LC          fx.Lifecycle
+	Config      *fxgrpc.Config
+	ServiceName toolkitfx.ServiceName
+	Handler     *Handler
 }
 
-func NewGRPCServer(lc fx.Lifecycle, config Config, grpcConfig fxgrpc.Config, sn toolkitfx.ServiceName) *fxgrpc.GRPCServer {
-	handler := NewHandler()
+func NewGRPCServer(params grpcServerParams) *fxgrpc.GRPCServer {
 	grpcServer := fxgrpc.GRPCServer{}
-	lc.Append(fx.Hook{
+	params.LC.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			server := grpcutils.NewServer(string(sn), net.JoinHostPort(grpcConfig.GRPC.Host, grpcConfig.GRPC.Port))
+			server := grpcutils.NewServer(string(params.ServiceName), net.JoinHostPort(params.Config.GRPC.Host, params.Config.GRPC.Port))
 			server.Init(
 				grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
-					MinTime:             config.GRPC.KeepAliveEnforcement.MinTime,
-					PermitWithoutStream: config.GRPC.KeepAliveEnforcement.PermitWithoutStream,
+					MinTime:             params.Config.GRPC.KeepAliveEnforcementMinTime,
+					PermitWithoutStream: params.Config.GRPC.KeepAliveEnforcementPermitWithoutStream,
 				}),
 				grpcutils.ValidatorServerOption(),
 				grpcutils.RecoveryServerOption(),
-				grpc.KeepaliveParams(keepalive.ServerParameters{MaxConnectionAge: config.GRPC.MaxConnectionAge}),
+				grpc.KeepaliveParams(keepalive.ServerParameters{MaxConnectionAge: params.Config.GRPC.MaxConnectionAge}),
 			)
-			pbv1.RegisterNetworkWardenServiceServer(server.Server, handler)
+			pbv1.RegisterNetworkWardenServiceServer(server.Server, params.Handler)
 			grpcServer.Server = server
 
 			return nil
@@ -56,26 +54,26 @@ func NewGRPCServer(lc fx.Lifecycle, config Config, grpcConfig fxgrpc.Config, sn 
 	return &grpcServer
 }
 
-func NewGatewayHandler() *fxgrpc.GatewayHandler {
-	return &fxgrpc.GatewayHandler{
+func NewHTTPGatewayHandler() *fxgrpc.HTTPGatewayHandler {
+	return &fxgrpc.HTTPGatewayHandler{
 		Handler: pbv1.RegisterNetworkWardenServiceHandler,
 	}
 }
 
-func NewLivenessGateway() *fxgrpc.LivenessHandler {
+func NewLivenessGateway() *fxgrpc.LivenessGatewayHandler {
 	health := healthcheck.NewHandler()
 	health.AddLivenessCheck("healthcheck", func() error { return nil })
-	return &fxgrpc.LivenessHandler{Handler: health}
+	return &fxgrpc.LivenessGatewayHandler{Handler: health}
 }
 
-func NewHTTPGateway(
+func RunHTTPGateway(
 	lc fx.Lifecycle,
 	s fx.Shutdowner,
 	logger *zap.Logger,
-	cfg fxgrpc.Config,
-	g *fxgrpc.GatewayHandler,
+	cfg *fxgrpc.Config,
+	g *fxgrpc.HTTPGatewayHandler,
 ) error {
-	httpAddr := net.JoinHostPort(cfg.HTTP.Host, cfg.HTTP.Port)
+	httpAddr := net.JoinHostPort(cfg.HTTPGateway.Host, cfg.HTTPGateway.Port)
 	mux := runtime.NewServeMux()
 	conn := grpcutils.NewClientConnection(net.JoinHostPort(cfg.GRPC.Host, cfg.GRPC.Port))
 
