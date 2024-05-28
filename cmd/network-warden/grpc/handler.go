@@ -3,7 +3,6 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/ecumenos-social/network-warden/models"
 	"github.com/ecumenos-social/network-warden/services/auth"
@@ -74,6 +73,9 @@ func (h *Handler) customizeLogger(ctx context.Context, operationName string) *za
 }
 
 func (h *Handler) CheckEmails(ctx context.Context, req *pbv1.CheckEmailsRequest) (*pbv1.CheckEmailsResponse, error) {
+	logger := h.customizeLogger(ctx, "CheckEmails")
+	defer logger.Info("request processed")
+
 	errs := make([]string, 0, len(req.Emails))
 	for _, email := range req.Emails {
 		if err := validators.ValidateEmail(ctx, email); err != nil {
@@ -83,18 +85,37 @@ func (h *Handler) CheckEmails(ctx context.Context, req *pbv1.CheckEmailsRequest)
 	if err := h.hs.CheckEmailsUsage(ctx, req.Emails); err != nil {
 		errs = append(errs, err.Error())
 	}
-	var result = "ok"
-	if len(errs) > 0 {
-		result = fmt.Sprintf("errors: %s", strings.Join(errs, ", "))
-	}
 
 	return &pbv1.CheckEmailsResponse{
-		Result: result,
+		Valid:   len(errs) == 0,
+		Results: errs,
+	}, nil
+}
+
+func (h *Handler) CheckPhoneNumbers(ctx context.Context, req *pbv1.CheckPhoneNumbersRequest) (*pbv1.CheckPhoneNumbersResponse, error) {
+	logger := h.customizeLogger(ctx, "CheckPhoneNumbers")
+	defer logger.Info("request processed")
+
+	errs := make([]string, 0, len(req.PhoneNumbers))
+	for _, phoneNumber := range req.PhoneNumbers {
+		if err := validators.ValidatePhoneNumber(ctx, phoneNumber); err != nil {
+			errs = append(errs, err.Error())
+		}
+	}
+	if err := h.hs.CheckPhoneNumbersUsage(ctx, req.PhoneNumbers); err != nil {
+		errs = append(errs, err.Error())
+	}
+
+	return &pbv1.CheckPhoneNumbersResponse{
+		Valid:   len(errs) == 0,
+		Results: errs,
 	}, nil
 }
 
 func (h *Handler) RegisterHolder(ctx context.Context, req *pbv1.RegisterHolderRequest) (*pbv1.RegisterHolderResponse, error) {
 	logger := h.customizeLogger(ctx, "RegisterHolder")
+	defer logger.Info("request processed")
+
 	if err := h.validateRegisterHolderRequest(ctx, req); err != nil {
 		logger.Error("validation error", zap.Error(err))
 		return nil, err
@@ -209,70 +230,121 @@ func (h *Handler) sendConfirmationMessage(ctx context.Context, holder *models.Ho
 	return pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_PHONE_NUMBER, nil
 }
 
-func (h *Handler) ConfirmHolderRegistration(context.Context, *pbv1.ConfirmHolderRegistrationRequest) (*pbv1.ConfirmHolderRegistrationResponse, error) {
+func (h *Handler) ConfirmHolderRegistration(ctx context.Context, _ *pbv1.ConfirmHolderRegistrationRequest) (*pbv1.ConfirmHolderRegistrationResponse, error) {
+	logger := h.customizeLogger(ctx, "ConfirmHolderRegistration")
+	defer logger.Info("request processed")
+
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) ResendConfirmationCode(context.Context, *pbv1.ResendConfirmationCodeRequest) (*pbv1.ResendConfirmationCodeResponse, error) {
+func (h *Handler) ResendConfirmationCode(ctx context.Context, _ *pbv1.ResendConfirmationCodeRequest) (*pbv1.ResendConfirmationCodeResponse, error) {
+	logger := h.customizeLogger(ctx, "ResendConfirmationCode")
+	defer logger.Info("request processed")
+
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) LoginHolder(context.Context, *pbv1.LoginHolderRequest) (*pbv1.LoginHolderResponse, error) {
+func (h *Handler) LoginHolder(ctx context.Context, _ *pbv1.LoginHolderRequest) (*pbv1.LoginHolderResponse, error) {
+	logger := h.customizeLogger(ctx, "LoginHolder")
+	defer logger.Info("request processed")
+
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) LogoutHolder(context.Context, *pbv1.LogoutHolderRequest) (*pbv1.LogoutHolderResponse, error) {
+func (h *Handler) LogoutHolder(ctx context.Context, _ *pbv1.LogoutHolderRequest) (*pbv1.LogoutHolderResponse, error) {
+	logger := h.customizeLogger(ctx, "LogoutHolder")
+	defer logger.Info("request processed")
+
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) RefreshHolderToken(context.Context, *pbv1.RefreshHolderTokenRequest) (*pbv1.RefreshHolderTokenResponse, error) {
+func (h *Handler) RefreshHolderToken(ctx context.Context, _ *pbv1.RefreshHolderTokenRequest) (*pbv1.RefreshHolderTokenResponse, error) {
+	logger := h.customizeLogger(ctx, "RefreshHolderToken")
+	defer logger.Info("request processed")
+
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) ChangeHolderPassword(context.Context, *pbv1.ChangeHolderPasswordRequest) (*pbv1.ChangeHolderPasswordResponse, error) {
+func (h *Handler) ChangeHolderPassword(ctx context.Context, _ *pbv1.ChangeHolderPasswordRequest) (*pbv1.ChangeHolderPasswordResponse, error) {
+	logger := h.customizeLogger(ctx, "ChangeHolderPassword")
+	defer logger.Info("request processed")
+
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) ModifyHolder(context.Context, *pbv1.ModifyHolderRequest) (*pbv1.ModifyHolderResponse, error) {
+func (h *Handler) ModifyHolder(ctx context.Context, _ *pbv1.ModifyHolderRequest) (*pbv1.ModifyHolderResponse, error) {
+	logger := h.customizeLogger(ctx, "ModifyHolder")
+	defer logger.Info("request processed")
+
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) GetHolder(context.Context, *pbv1.GetHolderRequest) (*pbv1.GetHolderResponse, error) {
+func (h *Handler) GetHolder(ctx context.Context, _ *pbv1.GetHolderRequest) (*pbv1.GetHolderResponse, error) {
+	logger := h.customizeLogger(ctx, "GetHolder")
+	defer logger.Info("request processed")
+
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) DeleteHolder(context.Context, *pbv1.DeleteHolderRequest) (*pbv1.DeleteHolderResponse, error) {
+func (h *Handler) DeleteHolder(ctx context.Context, _ *pbv1.DeleteHolderRequest) (*pbv1.DeleteHolderResponse, error) {
+	logger := h.customizeLogger(ctx, "DeleteHolder")
+	defer logger.Info("request processed")
+
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) GetPersonalDataNodesList(context.Context, *pbv1.GetPersonalDataNodesListRequest) (*pbv1.GetPersonalDataNodesListResponse, error) {
+func (h *Handler) GetPersonalDataNodesList(ctx context.Context, _ *pbv1.GetPersonalDataNodesListRequest) (*pbv1.GetPersonalDataNodesListResponse, error) {
+	logger := h.customizeLogger(ctx, "GetPersonalDataNodesList")
+	defer logger.Info("request processed")
+
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) JoinPersonalDataNodeRegistrationWaitlist(context.Context, *pbv1.JoinPersonalDataNodeRegistrationWaitlistRequest) (*pbv1.JoinPersonalDataNodeRegistrationWaitlistResponse, error) {
+func (h *Handler) JoinPersonalDataNodeRegistrationWaitlist(ctx context.Context, _ *pbv1.JoinPersonalDataNodeRegistrationWaitlistRequest) (*pbv1.JoinPersonalDataNodeRegistrationWaitlistResponse, error) {
+	logger := h.customizeLogger(ctx, "JoinPersonalDataNodeRegistrationWaitlist")
+	defer logger.Info("request processed")
+
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) RegisterPersonalDataNode(context.Context, *pbv1.RegisterPersonalDataNodeRequest) (*pbv1.RegisterPersonalDataNodeResponse, error) {
+func (h *Handler) RegisterPersonalDataNode(ctx context.Context, _ *pbv1.RegisterPersonalDataNodeRequest) (*pbv1.RegisterPersonalDataNodeResponse, error) {
+	logger := h.customizeLogger(ctx, "RegisterPersonalDataNode")
+	defer logger.Info("request processed")
+
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) GetNetworkNodesList(context.Context, *pbv1.GetNetworkNodesListRequest) (*pbv1.GetNetworkNodesListResponse, error) {
+func (h *Handler) GetNetworkNodesList(ctx context.Context, _ *pbv1.GetNetworkNodesListRequest) (*pbv1.GetNetworkNodesListResponse, error) {
+	logger := h.customizeLogger(ctx, "GetNetworkNodesList")
+	defer logger.Info("request processed")
+
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) JoinNetworkNodeRegistrationWaitlist(context.Context, *pbv1.JoinNetworkNodeRegistrationWaitlistRequest) (*pbv1.JoinNetworkNodeRegistrationWaitlistResponse, error) {
+func (h *Handler) JoinNetworkNodeRegistrationWaitlist(ctx context.Context, _ *pbv1.JoinNetworkNodeRegistrationWaitlistRequest) (*pbv1.JoinNetworkNodeRegistrationWaitlistResponse, error) {
+	logger := h.customizeLogger(ctx, "JoinNetworkNodeRegistrationWaitlist")
+	defer logger.Info("request processed")
+
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) RegisterNetworkNode(context.Context, *pbv1.RegisterNetworkNodeRequest) (*pbv1.RegisterNetworkNodeResponse, error) {
+func (h *Handler) RegisterNetworkNode(ctx context.Context, _ *pbv1.RegisterNetworkNodeRequest) (*pbv1.RegisterNetworkNodeResponse, error) {
+	logger := h.customizeLogger(ctx, "RegisterNetworkNode")
+	defer logger.Info("request processed")
+
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) GetNetworkWardensList(context.Context, *pbv1.GetNetworkWardensListRequest) (*pbv1.GetNetworkWardensListResponse, error) {
+func (h *Handler) GetNetworkWardensList(ctx context.Context, _ *pbv1.GetNetworkWardensListRequest) (*pbv1.GetNetworkWardensListResponse, error) {
+	logger := h.customizeLogger(ctx, "GetNetworkWardensList")
+	defer logger.Info("request processed")
+
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) RegisterNetworkWarden(context.Context, *pbv1.RegisterNetworkWardenRequest) (*pbv1.RegisterNetworkWardenResponse, error) {
+func (h *Handler) RegisterNetworkWarden(ctx context.Context, _ *pbv1.RegisterNetworkWardenRequest) (*pbv1.RegisterNetworkWardenResponse, error) {
+	logger := h.customizeLogger(ctx, "RegisterNetworkWarden")
+	defer logger.Info("request processed")
+
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
