@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ecumenos-social/network-warden/internal/validators"
 	"github.com/ecumenos-social/network-warden/models"
 	"github.com/ecumenos-social/network-warden/services/auth"
 	"github.com/ecumenos-social/network-warden/services/emailer"
@@ -12,6 +11,7 @@ import (
 	"github.com/ecumenos-social/network-warden/services/holders"
 	smssender "github.com/ecumenos-social/network-warden/services/sms-sender"
 	pbv1 "github.com/ecumenos-social/schemas/proto/gen/networkwarden/v1"
+	"github.com/ecumenos-social/toolkit/validators"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -141,7 +141,7 @@ func (h *Handler) validateRegisterHolderRequest(ctx context.Context, req *pbv1.R
 	}
 	if len(req.Emails) > 0 {
 		for _, email := range req.Emails {
-			if err := validators.ValidateEmail(email); err != nil {
+			if err := validators.ValidateEmail(ctx, email); err != nil {
 				return status.Errorf(codes.InvalidArgument, "invalid request, invalid email (email: %v, error = %v)", email, err.Error())
 			}
 		}
@@ -151,7 +151,7 @@ func (h *Handler) validateRegisterHolderRequest(ctx context.Context, req *pbv1.R
 	}
 	if len(req.PhoneNumbers) > 0 {
 		for _, phoneNumber := range req.PhoneNumbers {
-			if err := validators.ValidatePhoneNumber(phoneNumber); err != nil {
+			if err := validators.ValidatePhoneNumber(ctx, phoneNumber); err != nil {
 				return status.Errorf(codes.InvalidArgument, "invalid request, invalid phone number (phone_number: %v, error = %v)", phoneNumber, err.Error())
 			}
 		}
@@ -160,12 +160,12 @@ func (h *Handler) validateRegisterHolderRequest(ctx context.Context, req *pbv1.R
 		}
 	}
 	for _, cc := range req.Countries {
-		if err := validators.ValidateCountryCode(cc); err != nil {
+		if err := validators.ValidateCountryCode(ctx, cc); err != nil {
 			return status.Errorf(codes.InvalidArgument, "invalid request, invalid country code (country_code: %v, error = %v)", cc, err.Error())
 		}
 	}
 	for _, lc := range req.Languages {
-		if err := validators.ValidateLanguageCode(lc); err != nil {
+		if err := validators.ValidateLanguageCode(ctx, lc); err != nil {
 			return status.Errorf(codes.InvalidArgument, "invalid request, invalid language code (language_code: %v, error = %v)", lc, err.Error())
 		}
 	}

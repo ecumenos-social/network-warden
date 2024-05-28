@@ -7,10 +7,11 @@ import (
 	"strings"
 	"time"
 
+	errorwrapper "github.com/ecumenos-social/error-wrapper"
 	idgenerator "github.com/ecumenos-social/id-generator"
 	"github.com/ecumenos-social/network-warden/models"
-	"github.com/ecumenos-social/network-warden/pkg/toolkit/hash"
-	"github.com/ecumenos-social/network-warden/pkg/toolkit/random"
+	"github.com/ecumenos-social/toolkit/hash"
+	"github.com/ecumenos-social/toolkit/random"
 )
 
 type Repository interface {
@@ -43,7 +44,7 @@ func (s *service) CheckEmailsUsage(ctx context.Context, emails []string) error {
 		return err
 	}
 	if len(entities) > 0 {
-		return fmt.Errorf(`some email from emails list ([%s]) is in use`, strings.Join(emails, ", "))
+		return errorwrapper.New(fmt.Sprintf("some email from emails list ([%s]) is in use", strings.Join(emails, ", ")))
 	}
 
 	return nil
@@ -55,7 +56,7 @@ func (s *service) CheckPhoneNumbersUsage(ctx context.Context, phoneNumbers []str
 		return err
 	}
 	if len(entities) > 0 {
-		return fmt.Errorf(`some email from phone numbers list ([%s]) is in use`, strings.Join(phoneNumbers, ", "))
+		return errorwrapper.New(fmt.Sprintf("some email from phone numbers list ([%s]) is in use", strings.Join(phoneNumbers, ", ")))
 	}
 
 	return nil

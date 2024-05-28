@@ -4,9 +4,9 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"fmt"
 	"time"
 
+	errorwrapper "github.com/ecumenos-social/error-wrapper"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 )
@@ -58,12 +58,12 @@ func (s *service) CreateTokens(ctx context.Context, subj string) (string, string
 
 	accSig, err := jwt.Sign(accessTok, jwt.WithKey(jwa.HS256, s.jwtSigningKey))
 	if err != nil {
-		return "", "", fmt.Errorf("signing access token: %w", err)
+		return "", "", errorwrapper.WrapMessage(err, "signing access token")
 	}
 
 	refSig, err := jwt.Sign(refreshTok, jwt.WithKey(jwa.HS256, s.jwtSigningKey))
 	if err != nil {
-		return "", "", fmt.Errorf("signing refresh token: %w", err)
+		return "", "", errorwrapper.WrapMessage(err, "signing refresh token")
 	}
 
 	return string(accSig), string(refSig), nil
@@ -72,7 +72,7 @@ func (s *service) CreateTokens(ctx context.Context, subj string) (string, string
 func (s *service) DecodeToken(token string) (jwt.Token, error) {
 	t, err := jwt.ParseString(token, jwt.WithVerify(false), jwt.WithValidate(true))
 	if err != nil {
-		return nil, fmt.Errorf("decode token err: %w", err)
+		return nil, errorwrapper.WrapMessage(err, "decode token error")
 	}
 	return t, nil
 }
