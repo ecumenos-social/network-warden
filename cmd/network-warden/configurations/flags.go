@@ -151,4 +151,36 @@ var Flags = []cli.Flag{
 		Value:   90 * time.Minute,
 		EnvVars: []string{"NETWORK_WARDEN_HOLDER_SESSION_AGE"},
 	},
+	&cli.StringFlag{
+		Name:    "nw-emailer-smtp-host",
+		Usage:   "it is SMTP server host",
+		Value:   "smtp.sendgrid.net",
+		EnvVars: []string{"NETWORK_WARDEN_EMAILER_SMTP_HOST"},
+	},
+	&cli.StringFlag{
+		Name:  "nw-emailer-smtp-port",
+		Usage: "it is SMTP server port",
+		Value: "465",
+		// 25, 587	(for unencrypted/TLS connections)
+		// 465	(for SSL connections)
+		EnvVars: []string{"NETWORK_WARDEN_EMAILER_SMTP_PORT"},
+	},
+	&cli.StringFlag{
+		Name:    "nw-emailer-sender-username",
+		Usage:   "it is emailer sender's username. It is needed for authentication",
+		Value:   "apikey",
+		EnvVars: []string{"NETWORK_WARDEN_EMAILER_SENDER_USERNAME"},
+	},
+	&cli.StringFlag{
+		Name:    "nw-emailer-sender-password",
+		Usage:   "it is emailer sender's password. It is needed for authentication",
+		Value:   "secret-apikey",
+		EnvVars: []string{"NETWORK_WARDEN_EMAILER_SENDER_PASSWORD"},
+	},
+	&cli.StringFlag{
+		Name:    "nw-emailer-sender-email-address",
+		Usage:   "it is emailer sender's email address. It is needed for putting it to message",
+		Value:   "example@mail.com",
+		EnvVars: []string{"NETWORK_WARDEN_EMAILER_SENDER_EMAIL_ADDRESS"},
+	},
 }

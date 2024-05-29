@@ -78,7 +78,13 @@ var Module = func(cctx *cli.Context) fx.Option {
 				HolderSession: &holdersessions.Config{
 					Age: cctx.Duration("nw-holder-session-age"),
 				},
-				Emailer:   &emailer.Config{},
+				Emailer: &emailer.Config{
+					SMTPHost:           cctx.String("nw-emailer-smtp-host"),
+					SMTPPort:           cctx.String("nw-emailer-smtp-port"),
+					SenderUsername:     cctx.String("nw-emailer-sender-username"),
+					SenderEmailAddress: cctx.String("nw-emailer-sender-email-address"),
+					SenderPassword:     cctx.String("nw-emailer-sender-password"),
+				},
 				SMSSender: &smssender.Config{},
 			}
 		}),
