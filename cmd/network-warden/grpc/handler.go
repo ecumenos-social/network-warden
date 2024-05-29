@@ -234,7 +234,7 @@ func (h *Handler) validateRegisterHolderRequest(ctx context.Context, req *pbv1.R
 
 func (h *Handler) sendConfirmationMessage(ctx context.Context, holder *models.Holder) (pbv1.ConfirmationApproach, error) {
 	if len(holder.Emails) > 0 {
-		if err := h.emailer.Send(ctx); err != nil {
+		if err := h.emailer.SendConfirmationOfRegistration(ctx, holder.Emails[0], holder.Emails[0], holder.ConfirmationCode); err != nil {
 			return pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_UNKNOWN_UNSPECIFIED, err
 		}
 		return pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_EMAIL, nil
