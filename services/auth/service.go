@@ -74,5 +74,6 @@ func (s *service) DecodeToken(token string) (jwt.Token, error) {
 	if err != nil {
 		return nil, errorwrapper.WrapMessage(err, "decode token error")
 	}
+
 	return t, nil
 }
