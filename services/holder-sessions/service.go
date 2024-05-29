@@ -8,6 +8,7 @@ import (
 	errorwrapper "github.com/ecumenos-social/error-wrapper"
 	idgenerator "github.com/ecumenos-social/id-generator"
 	"github.com/ecumenos-social/network-warden/models"
+	"github.com/ecumenos-social/network-warden/services/auth"
 )
 
 type Config struct {
@@ -17,13 +18,15 @@ type Config struct {
 type Repository interface {
 	InsertHolderSession(ctx context.Context, holderSession *models.HolderSession) error
 	GetHolderSessionByRefreshToken(ctx context.Context, refToken string) (*models.HolderSession, error)
+	GetHolderSessionByToken(ctx context.Context, token string) (*models.HolderSession, error)
 	ModifyHolderSession(ctx context.Context, id int64, holderSession *models.HolderSession) error
 }
 
 type Service interface {
 	Insert(ctx context.Context, params *InsertParams) (*models.HolderSession, error)
-	GetHolderSessionByRefreshToken(ctx context.Context, refToken string) (*models.HolderSession, error)
+	GetHolderSessionByToken(ctx context.Context, token string, scope auth.TokenScope) (*models.HolderSession, error)
 	ModifyHolderSession(ctx context.Context, id int64, holderSession *models.HolderSession) error
+	MakeHolderSessionExpired(ctx context.Context, id int64, holderSession *models.HolderSession) error
 }
 
 type service struct {
@@ -77,8 +80,15 @@ func (s *service) Insert(ctx context.Context, params *InsertParams) (*models.Hol
 	return hs, nil
 }
 
-func (s *service) GetHolderSessionByRefreshToken(ctx context.Context, refToken string) (*models.HolderSession, error) {
-	hs, err := s.repo.GetHolderSessionByRefreshToken(ctx, refToken)
+func (s *service) GetHolderSessionByToken(ctx context.Context, token string, scope auth.TokenScope) (*models.HolderSession, error) {
+	var hs *models.HolderSession
+	var err error
+	switch scope {
+	case auth.TokenScopeAccess:
+		hs, err = s.repo.GetHolderSessionByToken(ctx, token)
+	case auth.TokenScopeRefresh:
+		hs, err = s.repo.GetHolderSessionByRefreshToken(ctx, token)
+	}
 	if err != nil {
 		return nil, errorwrapper.WrapMessage(err, "failed to get session")
 	}
@@ -96,6 +106,16 @@ func (s *service) ModifyHolderSession(ctx context.Context, id int64, holderSessi
 	holderSession.LastModifiedAt = time.Now()
 	holderSession.ExpiredAt = sql.NullTime{
 		Time:  time.Now().Add(s.sessionAge),
+		Valid: true,
+	}
+
+	return s.repo.ModifyHolderSession(ctx, id, holderSession)
+}
+
+func (s *service) MakeHolderSessionExpired(ctx context.Context, id int64, holderSession *models.HolderSession) error {
+	holderSession.LastModifiedAt = time.Now()
+	holderSession.ExpiredAt = sql.NullTime{
+		Time:  time.Now(),
 		Valid: true,
 	}
 

@@ -247,6 +247,34 @@ func (h *Handler) sendConfirmationMessage(ctx context.Context, holder *models.Ho
 	return pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_PHONE_NUMBER, nil
 }
 
+func (h *Handler) parseToken(ctx context.Context, token, remoteMacAddress string, scope auth.TokenScope) (*models.HolderSession, error) {
+	t, err := h.auth.DecodeToken(token)
+	if err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "invalid token")
+	}
+	anyHolderID, ok := t.Get("sub")
+	if !ok {
+		return nil, status.Errorf(codes.Unauthenticated, "invalid token, it doesn't contain holder information")
+	}
+
+	if _, err := strconv.ParseInt(fmt.Sprint(anyHolderID), 10, 64); err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "invalid token, holder information is formatted incorrectly")
+	}
+
+	hs, err := h.hss.GetHolderSessionByToken(ctx, token, scope)
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, err.Error())
+	}
+	if hs.RemoteIPAddress.Valid && hs.RemoteIPAddress.String != extractRemoteIPAddress(ctx) {
+		return nil, status.Error(codes.PermissionDenied, "no permissions")
+	}
+	if hs.RemoteMACAddress.Valid && hs.RemoteMACAddress.String != remoteMacAddress {
+		return nil, status.Error(codes.PermissionDenied, "no permissions")
+	}
+
+	return hs, nil
+}
+
 func (h *Handler) ConfirmHolderRegistration(ctx context.Context, _ *pbv1.ConfirmHolderRegistrationRequest) (*pbv1.ConfirmHolderRegistrationResponse, error) {
 	logger := h.customizeLogger(ctx, "ConfirmHolderRegistration")
 	defer logger.Info("request processed")
@@ -286,48 +314,29 @@ func (h *Handler) LoginHolder(ctx context.Context, req *pbv1.LoginHolderRequest)
 	}, nil
 }
 
-func (h *Handler) LogoutHolder(ctx context.Context, _ *pbv1.LogoutHolderRequest) (*pbv1.LogoutHolderResponse, error) {
+func (h *Handler) LogoutHolder(ctx context.Context, req *pbv1.LogoutHolderRequest) (*pbv1.LogoutHolderResponse, error) {
 	logger := h.customizeLogger(ctx, "LogoutHolder")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
-}
-
-func (h *Handler) parseRefreshToken(refreshToken string) (int64, error) {
-	token, err := h.auth.DecodeToken(refreshToken)
+	hs, err := h.parseToken(ctx, req.Token, req.RemoteMacAddress, auth.TokenScopeAccess)
 	if err != nil {
-		return 0, status.Errorf(codes.Unauthenticated, "invalid refresh token")
+		return nil, err
 	}
-	anyHolderID, ok := token.Get("sub")
-	if !ok {
-		return 0, status.Errorf(codes.Unauthenticated, "invalid refresh token, it doesn't contain holder information")
-	}
-
-	holderID, err := strconv.ParseInt(fmt.Sprint(anyHolderID), 10, 64)
-	if err != nil {
-		return 0, status.Errorf(codes.Unauthenticated, "invalid refresh token, holder information is formatted incorrectly")
+	if err := h.hss.MakeHolderSessionExpired(ctx, hs.HolderID, hs); err != nil {
+		logger.Error("make holder session expired error", zap.Error(err))
+		return nil, status.Errorf(codes.Internal, "failed modify session (error = %v)", err.Error())
 	}
 
-	return holderID, nil
+	return &pbv1.LogoutHolderResponse{Success: true}, nil
 }
 
 func (h *Handler) RefreshHolderToken(ctx context.Context, req *pbv1.RefreshHolderTokenRequest) (*pbv1.RefreshHolderTokenResponse, error) {
 	logger := h.customizeLogger(ctx, "RefreshHolderToken")
 	defer logger.Info("request processed")
 
-	if _, err := h.parseRefreshToken(req.RefreshToken); err != nil {
-		return nil, err
-	}
-
-	hs, err := h.hss.GetHolderSessionByRefreshToken(ctx, req.RefreshToken)
+	hs, err := h.parseToken(ctx, req.RefreshToken, req.RemoteMacAddress, auth.TokenScopeRefresh)
 	if err != nil {
-		return nil, status.Error(codes.Unauthenticated, err.Error())
-	}
-	if hs.RemoteIPAddress.Valid && hs.RemoteIPAddress.String != extractRemoteIPAddress(ctx) {
-		return nil, status.Error(codes.PermissionDenied, "no permissions for refreshing session")
-	}
-	if hs.RemoteMACAddress.Valid && hs.RemoteMACAddress.String != req.RemoteMacAddress {
-		return nil, status.Error(codes.PermissionDenied, "no permissions for refreshing session")
+		return nil, err
 	}
 
 	token, refreshToken, err := h.auth.CreateTokens(ctx, fmt.Sprint(hs.HolderID))
@@ -339,7 +348,7 @@ func (h *Handler) RefreshHolderToken(ctx context.Context, req *pbv1.RefreshHolde
 	hs.Token = token
 	hs.RefreshToken = refreshToken
 	if err := h.hss.ModifyHolderSession(ctx, hs.HolderID, hs); err != nil {
-		logger.Error("create token pair error", zap.Error(err))
+		logger.Error("modify holder session error", zap.Error(err))
 		return nil, status.Errorf(codes.Internal, "failed modify session (error = %v)", err.Error())
 	}
 

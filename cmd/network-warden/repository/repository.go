@@ -208,6 +208,29 @@ func (r *Repository) GetHolderSessionByRefreshToken(ctx context.Context, refToke
 	return nil, err
 }
 
+func (r *Repository) GetHolderSessionByToken(ctx context.Context, token string) (*models.HolderSession, error) {
+	q := `
+  select
+  id, created_at, last_modified_at, holder_id, token, refresh_token, expired_at, remote_ip_address, remote_mac_address
+  from public.holder_sessions
+  where token=$1;`
+	row, err := r.driver.QueryRow(ctx, q, token)
+	if err != nil {
+		return nil, err
+	}
+
+	hs, err := r.scanHolderSession(row)
+	if err == nil {
+		return hs, nil
+	}
+
+	if primitives.IsSameError(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+
+	return nil, err
+}
+
 func (r *Repository) ModifyHolderSession(ctx context.Context, id int64, holderSession *models.HolderSession) error {
 	query := `update public.holder_sessions
   set created_at=$2, last_modified_at=$3, holder_id=$4, token=$5, refresh_token=$6, expired_at=$7, remote_ip_address=$8, remote_mac_address=$9

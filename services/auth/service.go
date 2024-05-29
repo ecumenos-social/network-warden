@@ -36,7 +36,7 @@ func New(config *Config) Service {
 	}
 }
 
-func makeToken(subject string, scope string, exp time.Time) jwt.Token {
+func makeToken(subject string, scope TokenScope, exp time.Time) jwt.Token {
 	tok := jwt.New()
 	tok.Set("scope", scope)
 	tok.Set("sub", subject)
@@ -46,11 +46,16 @@ func makeToken(subject string, scope string, exp time.Time) jwt.Token {
 	return tok
 }
 
+type TokenScope string
+
+const TokenScopeAccess TokenScope = "access"
+const TokenScopeRefresh TokenScope = "refresh"
+
 func (s *service) CreateTokens(ctx context.Context, subj string) (string, string, error) {
 	tokExp := time.Now().Add(s.tokenAge)
 	refTokExp := time.Now().Add(s.refreshTokenAge)
-	accessTok := makeToken(subj, "access", tokExp)
-	refreshTok := makeToken(subj, "refresh", refTokExp)
+	accessTok := makeToken(subj, TokenScopeAccess, tokExp)
+	refreshTok := makeToken(subj, TokenScopeRefresh, refTokExp)
 
 	rVal := make([]byte, 10)
 	rand.Read(rVal)
