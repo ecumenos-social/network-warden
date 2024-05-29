@@ -18,12 +18,16 @@ type Repository interface {
 	GetHoldersByEmails(ctx context.Context, emails []string) ([]*models.Holder, error)
 	GetHoldersByPhoneNumbers(ctx context.Context, phoneNumbers []string) ([]*models.Holder, error)
 	InsertHolder(ctx context.Context, holder *models.Holder) error
+	GetHolderByEmail(ctx context.Context, email string) (*models.Holder, error)
+	GetHolderByPhoneNumber(ctx context.Context, phoneNumber string) (*models.Holder, error)
 }
 
 type Service interface {
 	CheckEmailsUsage(ctx context.Context, emails []string) error
 	CheckPhoneNumbersUsage(ctx context.Context, phoneNumbers []string) error
 	Insert(ctx context.Context, params *InsertParams) (*models.Holder, error)
+	GetHolderByEmailOrPhoneNumber(ctx context.Context, email, phoneNumber string) (*models.Holder, error)
+	ValidatePassword(ctx context.Context, holder *models.Holder, password string) error
 }
 
 type service struct {
@@ -105,4 +109,24 @@ func (s *service) Insert(ctx context.Context, params *InsertParams) (*models.Hol
 
 func generateConfirmationCode() string {
 	return random.GenNumericString(10)
+}
+
+func (s *service) GetHolderByEmailOrPhoneNumber(ctx context.Context, email, phoneNumber string) (*models.Holder, error) {
+	if email == "" && phoneNumber == "" {
+		return nil, errorwrapper.New("can not query holder if email address is empty and phone number is empty")
+	}
+
+	if email != "" {
+		return s.repo.GetHolderByEmail(ctx, email)
+	}
+
+	return s.repo.GetHolderByPhoneNumber(ctx, phoneNumber)
+}
+
+func (s *service) ValidatePassword(_ context.Context, holder *models.Holder, password string) error {
+	if hash.CompareHash(password, holder.PasswordHash) {
+		return nil
+	}
+
+	return errorwrapper.New("invalid password")
 }

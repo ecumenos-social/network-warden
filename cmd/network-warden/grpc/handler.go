@@ -137,20 +137,9 @@ func (h *Handler) RegisterHolder(ctx context.Context, req *pbv1.RegisterHolderRe
 		return nil, status.Errorf(codes.Internal, "failed create holder entity (error = %v)", err.Error())
 	}
 
-	token, refreshToken, err := h.auth.CreateTokens(ctx, fmt.Sprint(holder.ID))
+	token, refreshToken, err := h.createSession(ctx, logger, holder.ID, extractRemoteIPAddress(ctx), req.RemoteMacAddress)
 	if err != nil {
-		logger.Error("create token pair error", zap.Error(err))
-		return nil, status.Errorf(codes.Internal, "failed create tokens (error = %v)", err.Error())
-	}
-	if _, err := h.hss.Insert(ctx, &holdersessions.InsertParams{
-		HolderID:         holder.ID,
-		Token:            token,
-		RefreshToken:     refreshToken,
-		RemoteIPAddress:  extractRemoteIPAddress(ctx),
-		RemoteMACAddress: req.RemoteMacAddress,
-	}); err != nil {
-		logger.Error("insert holder session error", zap.Error(err))
-		return nil, status.Errorf(codes.Internal, "failed create session (error = %v)", err.Error())
+		return nil, err
 	}
 	approach, err := h.sendConfirmationMessage(ctx, holder)
 	if err != nil {
@@ -172,6 +161,28 @@ func extractRemoteIPAddress(ctx context.Context) string {
 	}
 
 	return ""
+}
+
+func (h *Handler) createSession(ctx context.Context, logger *zap.Logger, holderID int64, ip, mac string) (string, string, error) {
+	token, refreshToken, err := h.auth.CreateTokens(ctx, fmt.Sprint(holderID))
+	if err != nil {
+		logger.Error("create token pair error", zap.Error(err))
+		return "", "", status.Errorf(codes.Internal, "failed create tokens (error = %v)", err.Error())
+	}
+
+	_, err = h.hss.Insert(ctx, &holdersessions.InsertParams{
+		HolderID:         holderID,
+		Token:            token,
+		RefreshToken:     refreshToken,
+		RemoteIPAddress:  ip,
+		RemoteMACAddress: mac,
+	})
+	if err != nil {
+		logger.Error("insert holder session error", zap.Error(err))
+		return "", "", status.Errorf(codes.Internal, "failed create session (error = %v)", err.Error())
+	}
+
+	return token, refreshToken, nil
 }
 
 func (h *Handler) validateRegisterHolderRequest(ctx context.Context, req *pbv1.RegisterHolderRequest) error {
@@ -244,11 +255,29 @@ func (h *Handler) ResendConfirmationCode(ctx context.Context, _ *pbv1.ResendConf
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) LoginHolder(ctx context.Context, _ *pbv1.LoginHolderRequest) (*pbv1.LoginHolderResponse, error) {
+func (h *Handler) LoginHolder(ctx context.Context, req *pbv1.LoginHolderRequest) (*pbv1.LoginHolderResponse, error) {
 	logger := h.customizeLogger(ctx, "LoginHolder")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	holder, err := h.hs.GetHolderByEmailOrPhoneNumber(ctx, req.Email, req.PhoneNumber)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed get holder, err=%v", err.Error())
+	}
+	if holder == nil {
+		return nil, status.Error(codes.InvalidArgument, "holder not found")
+	}
+	if err := h.hs.ValidatePassword(ctx, holder, req.Password); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid password")
+	}
+	token, refreshToken, err := h.createSession(ctx, logger, holder.ID, extractRemoteIPAddress(ctx), req.RemoteMacAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pbv1.LoginHolderResponse{
+		Token:        token,
+		RefreshToken: refreshToken,
+	}, nil
 }
 
 func (h *Handler) LogoutHolder(ctx context.Context, _ *pbv1.LogoutHolderRequest) (*pbv1.LogoutHolderResponse, error) {
