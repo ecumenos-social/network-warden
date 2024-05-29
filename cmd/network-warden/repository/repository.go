@@ -7,6 +7,7 @@ import (
 
 	"github.com/ecumenos-social/network-warden/models"
 	"github.com/ecumenos-social/network-warden/pkg/fxpostgres"
+	"github.com/ecumenos-social/toolkit/primitives"
 	"github.com/jackc/pgx/v4"
 )
 
@@ -18,7 +19,11 @@ func New(driver fxpostgres.Driver) *Repository {
 	return &Repository{driver: driver}
 }
 
-func (r *Repository) scanHolder(rows pgx.Rows) (*models.Holder, error) {
+type scanner interface {
+	Scan(dest ...interface{}) error
+}
+
+func (r *Repository) scanHolder(rows scanner) (*models.Holder, error) {
 	var h models.Holder
 	err := rows.Scan(
 		&h.ID,
@@ -39,8 +44,8 @@ func (r *Repository) scanHolder(rows pgx.Rows) (*models.Holder, error) {
 func (r *Repository) GetHoldersByEmails(ctx context.Context, emails []string) ([]*models.Holder, error) {
 	q := fmt.Sprintf(`
     select
-        id, created_at, last_modified_at, emails, phone_numbers, avatar_image_url,
-        countries, languages, password_hash, confirmed, confirmation_code
+      id, created_at, last_modified_at, emails, phone_numbers, avatar_image_url,
+      countries, languages, password_hash, confirmed, confirmation_code
     from public.holders
     where emails && array[%s]::text[];`, "'"+strings.Join(emails, "', '")+"'")
 	rows, err := r.driver.QueryRows(ctx, q)
@@ -66,8 +71,8 @@ func (r *Repository) GetHoldersByEmails(ctx context.Context, emails []string) ([
 func (r *Repository) GetHoldersByPhoneNumbers(ctx context.Context, phoneNumbers []string) ([]*models.Holder, error) {
 	q := fmt.Sprintf(`
     select
-        id, created_at, last_modified_at, emails, phone_numbers, avatar_image_url,
-        countries, languages, password_hash, confirmed, confirmation_code
+      id, created_at, last_modified_at, emails, phone_numbers, avatar_image_url,
+      countries, languages, password_hash, confirmed, confirmation_code
     from public.holders
     where phone_numbers && array[%s]::text[];`, "'"+strings.Join(phoneNumbers, "', '")+"'")
 	rows, err := r.driver.QueryRows(ctx, q)
@@ -88,6 +93,54 @@ func (r *Repository) GetHoldersByPhoneNumbers(ctx context.Context, phoneNumbers 
 	}
 
 	return out, nil
+}
+
+func (r *Repository) GetHolderByEmail(ctx context.Context, email string) (*models.Holder, error) {
+	q := fmt.Sprintf(`
+    select
+      id, created_at, last_modified_at, emails, phone_numbers, avatar_image_url,
+      countries, languages, password_hash, confirmed, confirmation_code
+    from public.holders
+    where emails && array['%s']::text[];`, email)
+	row, err := r.driver.QueryRow(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+
+	h, err := r.scanHolder(row)
+	if err == nil {
+		return h, nil
+	}
+
+	if primitives.IsSameError(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+
+	return nil, err
+}
+
+func (r *Repository) GetHolderByPhoneNumber(ctx context.Context, phoneNumber string) (*models.Holder, error) {
+	q := fmt.Sprintf(`
+    select
+      id, created_at, last_modified_at, emails, phone_numbers, avatar_image_url,
+      countries, languages, password_hash, confirmed, confirmation_code
+    from public.holders
+    where phone_numbers && array['%s']::text[];`, phoneNumber)
+	row, err := r.driver.QueryRow(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+
+	h, err := r.scanHolder(row)
+	if err == nil {
+		return h, nil
+	}
+
+	if primitives.IsSameError(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+
+	return nil, err
 }
 
 func (r *Repository) InsertHolder(ctx context.Context, holder *models.Holder) error {
