@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"time"
 
+	errorwrapper "github.com/ecumenos-social/error-wrapper"
 	idgenerator "github.com/ecumenos-social/id-generator"
 	"github.com/ecumenos-social/network-warden/models"
 )
@@ -15,10 +16,14 @@ type Config struct {
 
 type Repository interface {
 	InsertHolderSession(ctx context.Context, holderSession *models.HolderSession) error
+	GetHolderSessionByRefreshToken(ctx context.Context, refToken string) (*models.HolderSession, error)
+	ModifyHolderSession(ctx context.Context, id int64, holderSession *models.HolderSession) error
 }
 
 type Service interface {
 	Insert(ctx context.Context, params *InsertParams) (*models.HolderSession, error)
+	GetHolderSessionByRefreshToken(ctx context.Context, refToken string) (*models.HolderSession, error)
+	ModifyHolderSession(ctx context.Context, id int64, holderSession *models.HolderSession) error
 }
 
 type service struct {
@@ -70,4 +75,29 @@ func (s *service) Insert(ctx context.Context, params *InsertParams) (*models.Hol
 	}
 
 	return hs, nil
+}
+
+func (s *service) GetHolderSessionByRefreshToken(ctx context.Context, refToken string) (*models.HolderSession, error) {
+	hs, err := s.repo.GetHolderSessionByRefreshToken(ctx, refToken)
+	if err != nil {
+		return nil, errorwrapper.WrapMessage(err, "failed to get session")
+	}
+	if hs == nil {
+		return nil, errorwrapper.New("session is not found")
+	}
+	if hs.ExpiredAt.Valid && hs.ExpiredAt.Time.Before(time.Now()) {
+		return nil, errorwrapper.New("token was expired")
+	}
+
+	return hs, nil
+}
+
+func (s *service) ModifyHolderSession(ctx context.Context, id int64, holderSession *models.HolderSession) error {
+	holderSession.LastModifiedAt = time.Now()
+	holderSession.ExpiredAt = sql.NullTime{
+		Time:  time.Now().Add(s.sessionAge),
+		Valid: true,
+	}
+
+	return s.repo.ModifyHolderSession(ctx, id, holderSession)
 }
