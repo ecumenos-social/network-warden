@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
+	errorwrapper "github.com/ecumenos-social/error-wrapper"
 	"github.com/ecumenos-social/network-warden/models"
 	"github.com/ecumenos-social/network-warden/pkg/grpcutils"
 	"github.com/ecumenos-social/network-warden/services/auth"
@@ -141,8 +142,11 @@ func (h *Handler) RegisterHolder(ctx context.Context, req *pbv1.RegisterHolderRe
 	if err != nil {
 		return nil, err
 	}
-	approach, err := h.sendConfirmationMessage(ctx, logger, holder)
-	if err != nil {
+	approach := pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_PHONE_NUMBER
+	if len(holder.Emails) > 0 {
+		approach = pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_EMAIL
+	}
+	if err := h.sendConfirmationMessage(ctx, logger, approach, holder); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed send confirmation (error = %v)", err.Error())
 	}
 
@@ -214,19 +218,20 @@ func (h *Handler) validateRegisterHolderRequest(ctx context.Context, logger *zap
 	return nil
 }
 
-func (h *Handler) sendConfirmationMessage(ctx context.Context, logger *zap.Logger, holder *models.Holder) (pbv1.ConfirmationApproach, error) {
-	if len(holder.Emails) > 0 {
+func (h *Handler) sendConfirmationMessage(ctx context.Context, logger *zap.Logger, approach pbv1.ConfirmationApproach, holder *models.Holder) error {
+	if approach == pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_EMAIL {
 		if err := h.emailer.SendConfirmationOfRegistration(ctx, logger, holder.Emails[0], holder.Emails[0], holder.ConfirmationCode); err != nil {
-			return pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_UNKNOWN_UNSPECIFIED, err
+			return err
 		}
-		return pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_EMAIL, nil
+		return nil
+	}
+	if approach == pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_PHONE_NUMBER {
+		if err := h.smsSender.Send(ctx); err != nil {
+			return err
+		}
 	}
 
-	if err := h.smsSender.Send(ctx); err != nil {
-		return pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_UNKNOWN_UNSPECIFIED, err
-	}
-
-	return pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_PHONE_NUMBER, nil
+	return errorwrapper.New("unknown approach for sending confirmation of registration code")
 }
 
 func (h *Handler) parseToken(ctx context.Context, logger *zap.Logger, token, remoteMacAddress string, scope jwt.TokenScope) (*models.HolderSession, error) {
@@ -267,6 +272,8 @@ func (h *Handler) ConfirmHolderRegistration(ctx context.Context, req *pbv1.Confi
 	if err != nil {
 		return nil, err
 	}
+	logger = logger.With(zap.Int64("holder-id", hs.HolderID))
+
 	logger = logger.With(zap.Int64("session-holder-id", hs.HolderID))
 	if _, err := h.hs.Confirm(ctx, logger, hs.HolderID, req.ConfirmationCode); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to confirm holder registration (err = %v)", err.Error())
@@ -275,11 +282,40 @@ func (h *Handler) ConfirmHolderRegistration(ctx context.Context, req *pbv1.Confi
 	return &pbv1.ConfirmHolderRegistrationResponse{Success: true}, nil
 }
 
-func (h *Handler) ResendConfirmationCode(ctx context.Context, _ *pbv1.ResendConfirmationCodeRequest) (*pbv1.ResendConfirmationCodeResponse, error) {
+func (h *Handler) ResendConfirmationCode(ctx context.Context, req *pbv1.ResendConfirmationCodeRequest) (*pbv1.ResendConfirmationCodeResponse, error) {
 	logger := h.customizeLogger(ctx, "ResendConfirmationCode")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("holder-id", hs.HolderID))
+
+	holder, err := h.hs.GetHolderByID(ctx, logger, hs.HolderID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get holder for resending confirmation code, err = %v", err.Error())
+	}
+	if holder == nil {
+		return nil, status.Error(codes.InvalidArgument, "can not found holder by token's information")
+	}
+	canSend, err := h.emailer.CanSendConfirmationOfRegistration(ctx, logger, holder.Emails[0])
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to verify if service can send confirmation code, err = %v", err.Error())
+	}
+	if !canSend {
+		return nil, status.Error(codes.InvalidArgument, "rate limit of sent emails was exceeded. please, try next time")
+	}
+
+	holder, err = h.hs.RegenerateConfirmationCode(ctx, logger, hs.HolderID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to regenerate confirmation code, err = %v", err.Error())
+	}
+	if err := h.sendConfirmationMessage(ctx, logger, req.ConfirmationApproach, holder); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed send confirmation (error = %v)", err.Error())
+	}
+
+	return &pbv1.ResendConfirmationCodeResponse{Success: true}, nil
 }
 
 func (h *Handler) LoginHolder(ctx context.Context, req *pbv1.LoginHolderRequest) (*pbv1.LoginHolderResponse, error) {

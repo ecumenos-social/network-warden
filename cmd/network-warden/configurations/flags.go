@@ -183,4 +183,16 @@ var Flags = []cli.Flag{
 		Value:   "example@mail.com",
 		EnvVars: []string{"NETWORK_WARDEN_EMAILER_SENDER_EMAIL_ADDRESS"},
 	},
+	&cli.Int64Flag{
+		Name:    "nw-emailer-confirmation-of-registration-max-requests",
+		Usage:   "it is rate limit value for maximal amount of requests for some interval",
+		Value:   3,
+		EnvVars: []string{"NETWORK_WARDEN_EMAILER_CONFIRMATION_OF_REGISTRATION_MAX_REQUESTS"},
+	},
+	&cli.DurationFlag{
+		Name:    "nw-emailer-confirmation-of-registration-interval",
+		Usage:   "it is rate limit value for interval when we measure requests",
+		Value:   5 * time.Minute,
+		EnvVars: []string{"NETWORK_WARDEN_EMAILER_CONFIRMATION_OF_REGISTRATION_INTERVAL"},
+	},
 }

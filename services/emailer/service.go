@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	errorwrapper "github.com/ecumenos-social/error-wrapper"
 	idgenerator "github.com/ecumenos-social/id-generator"
 	"github.com/ecumenos-social/network-warden/models"
 	"github.com/ecumenos-social/network-warden/pkg/sliceutils"
@@ -21,20 +22,26 @@ type Config struct {
 	SenderUsername     string
 	SenderEmailAddress string
 	SenderPassword     string
+
+	ConfirmationOfRegistration *RateLimit
 }
 
 type Repository interface {
-	InsertSentEmail(ctx context.Context, sentEmail *models.SentEmail) error
+	InsertSentEmail(ctx context.Context, se *models.SentEmail) error
+	ModifySentEmail(ctx context.Context, id int64, se *models.SentEmail) error
+	GetSentEmails(ctx context.Context, sender, receiver, templateName string) ([]*models.SentEmail, error)
 }
 
 type Service interface {
 	SendConfirmationOfRegistration(ctx context.Context, logger *zap.Logger, email, fullName, code string) error
+	CanSendConfirmationOfRegistration(ctx context.Context, logger *zap.Logger, email string) (bool, error)
 }
 
 type service struct {
 	smtpAddr           string
 	smtpAuth           smtp.Auth
 	senderEmailAddress string
+	rateLimits         map[TemplateName]*RateLimit
 
 	repo        Repository
 	idgenerator idgenerator.Generator
@@ -50,6 +57,9 @@ func New(config *Config, repo Repository, g idgenerator.Generator) Service {
 			config.SMTPHost,
 		),
 		senderEmailAddress: config.SenderEmailAddress,
+		rateLimits: map[TemplateName]*RateLimit{
+			TemplateNameConfirmHolderRegistration: config.ConfirmationOfRegistration,
+		},
 
 		repo:        repo,
 		idgenerator: g,
@@ -69,15 +79,25 @@ func (s *service) SendConfirmationOfRegistration(ctx context.Context, logger *za
 			ConfirmationCode: code,
 			CurrentYear:      fmt.Sprint(time.Now().Year()),
 		},
+		s.rateLimits[TemplateNameConfirmHolderRegistration],
 	)
 }
 
-func (s *service) sendTemplate(ctx context.Context, logger *zap.Logger, name TemplateName, to, cc, files []string, data interface{}) error {
+func (s *service) sendTemplate(ctx context.Context, logger *zap.Logger, name TemplateName, to, cc, files []string, data interface{}, rl *RateLimit) error {
 	logger = logger.With(
 		zap.Strings("to", to),
 		zap.Strings("cc", cc),
 		zap.String("template-name", string(name)),
 	)
+	canSend, err := s.canSendTemplate(ctx, logger, name, to, cc, rl)
+	if err != nil {
+		return err
+	}
+	if !canSend {
+		logger.Error("too many send email requests", zap.Int64("max-requests", rl.MaxRequests), zap.Duration("interval", rl.Interval))
+		return errorwrapper.New("too many send email requests")
+	}
+
 	message, err := s.formMessage(name, s.senderEmailAddress, to, cc, data)
 	if err != nil {
 		logger.Info("failed to compose email message", zap.Error(err))
@@ -105,6 +125,25 @@ func (s *service) sendTemplate(ctx context.Context, logger *zap.Logger, name Tem
 	}
 
 	return nil
+}
+
+func (s *service) CanSendConfirmationOfRegistration(ctx context.Context, logger *zap.Logger, email string) (bool, error) {
+	return s.canSendTemplate(ctx, logger, TemplateNameConfirmHolderRegistration, []string{email}, []string{}, s.rateLimits[TemplateNameConfirmHolderRegistration])
+}
+
+func (s *service) canSendTemplate(ctx context.Context, logger *zap.Logger, name TemplateName, to, cc []string, rl *RateLimit) (bool, error) {
+	receivers := sliceutils.Merge(to, cc)
+	ses := make([]*models.SentEmail, 0, len(receivers))
+	for _, r := range receivers {
+		sentEmails, err := s.repo.GetSentEmails(ctx, s.senderEmailAddress, r, name.String())
+		if err != nil {
+			logger.Error("can not get sent emails", zap.Error(err))
+			return false, errorwrapper.WrapMessage(err, "can not get sent emails")
+		}
+		ses = append(ses, sentEmails...)
+	}
+
+	return !rl.Exceed(ses), nil
 }
 
 func (s *service) formMessage(name TemplateName, from string, to, cc []string, data interface{}) ([]byte, error) {

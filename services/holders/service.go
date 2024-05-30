@@ -33,6 +33,7 @@ type Service interface {
 	ValidatePassword(ctx context.Context, logger *zap.Logger, holder *models.Holder, password string) error
 	GetHolderByID(ctx context.Context, logger *zap.Logger, id int64) (*models.Holder, error)
 	Confirm(ctx context.Context, logger *zap.Logger, id int64, confirmationCode string) (*models.Holder, error)
+	RegenerateConfirmationCode(ctx context.Context, logger *zap.Logger, id int64) (*models.Holder, error)
 }
 
 type service struct {
@@ -167,7 +168,7 @@ func (s *service) ValidatePassword(_ context.Context, logger *zap.Logger, holder
 func (s *service) GetHolderByID(ctx context.Context, logger *zap.Logger, id int64) (*models.Holder, error) {
 	h, err := s.repo.GetHolderByID(ctx, id)
 	if err != nil {
-		logger.Error("failed get holder by id", zap.Error(err), zap.Int64("holder-id", id))
+		logger.Error("failed get holder by id", zap.Error(err))
 		return nil, err
 	}
 
@@ -175,7 +176,6 @@ func (s *service) GetHolderByID(ctx context.Context, logger *zap.Logger, id int6
 }
 
 func (s *service) Confirm(ctx context.Context, logger *zap.Logger, id int64, confirmationCode string) (*models.Holder, error) {
-	logger = logger.With(zap.Int64("holder-id", id))
 	holder, err := s.repo.GetHolderByID(ctx, id)
 	if err != nil {
 		logger.Error("failed to get holder by id", zap.Error(err))
@@ -192,6 +192,22 @@ func (s *service) Confirm(ctx context.Context, logger *zap.Logger, id int64, con
 	holder.Confirmed = true
 	if err := s.repo.ModifyHolder(ctx, id, holder); err != nil {
 		logger.Error("failed to modify holder to make confirm=true", zap.Error(err))
+		return nil, err
+	}
+
+	return holder, nil
+}
+
+func (s *service) RegenerateConfirmationCode(ctx context.Context, logger *zap.Logger, id int64) (*models.Holder, error) {
+	holder, err := s.repo.GetHolderByID(ctx, id)
+	if err != nil {
+		logger.Error("failed to get holder by id", zap.Error(err))
+		return nil, err
+	}
+
+	holder.ConfirmationCode = generateConfirmationCode()
+	if err := s.repo.ModifyHolder(ctx, id, holder); err != nil {
+		logger.Error("failed to modify holder to make confirmation_code={{new_confirmation_code}}", zap.Error(err))
 		return nil, err
 	}
 

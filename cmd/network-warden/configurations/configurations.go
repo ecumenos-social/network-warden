@@ -84,6 +84,10 @@ var Module = func(cctx *cli.Context) fx.Option {
 					SenderUsername:     cctx.String("nw-emailer-sender-username"),
 					SenderEmailAddress: cctx.String("nw-emailer-sender-email-address"),
 					SenderPassword:     cctx.String("nw-emailer-sender-password"),
+					ConfirmationOfRegistration: &emailer.RateLimit{
+						MaxRequests: cctx.Int64("nw-emailer-confirmation-of-registration-max-requests"),
+						Interval:    cctx.Duration("nw-emailer-confirmation-of-registration-interval"),
+					},
 				},
 				SMSSender: &smssender.Config{},
 			}
