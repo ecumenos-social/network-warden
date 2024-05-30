@@ -34,6 +34,7 @@ type Service interface {
 	GetHolderByID(ctx context.Context, logger *zap.Logger, id int64) (*models.Holder, error)
 	Confirm(ctx context.Context, logger *zap.Logger, id int64, confirmationCode string) (*models.Holder, error)
 	RegenerateConfirmationCode(ctx context.Context, logger *zap.Logger, id int64) (*models.Holder, error)
+	ChangePassword(ctx context.Context, logger *zap.Logger, holder *models.Holder, password string) error
 }
 
 type service struct {
@@ -212,4 +213,19 @@ func (s *service) RegenerateConfirmationCode(ctx context.Context, logger *zap.Lo
 	}
 
 	return holder, nil
+}
+
+func (s *service) ChangePassword(ctx context.Context, logger *zap.Logger, holder *models.Holder, password string) error {
+	passwordHash, err := hash.Hash(password)
+	if err != nil {
+		logger.Error("failed to hash password", zap.Error(err))
+		return err
+	}
+
+	holder.PasswordHash = passwordHash
+	if err := s.repo.ModifyHolder(ctx, holder.ID, holder); err != nil {
+		logger.Error("failed to modify holder to change password", zap.Error(err))
+		return err
+	}
+	return nil
 }
