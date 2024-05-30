@@ -30,4 +30,16 @@ create table public.holder_sessions
   remote_mac_address text
 );
 
+create table public.sent_emails
+(
+  id               bigint primary key,
+  created_at       timestamp(0) with time zone default current_timestamp not null,
+  last_modified_at timestamp(0) with time zone default current_timestamp not null,
+  sender_email     text not null,
+  receiver_email   text not null,
+  template_name    text not null
+);
+create index sent_emails_receiver_email_index on sent_emails (receiver_email);
+create index sent_emails_template_name_index on sent_emails (template_name);
+
 commit;

@@ -7,8 +7,8 @@ import (
 	"github.com/ecumenos-social/network-warden/pkg/fxpostgres"
 	"github.com/ecumenos-social/network-warden/services/auth"
 	"github.com/ecumenos-social/network-warden/services/emailer"
-	holdersessions "github.com/ecumenos-social/network-warden/services/holder-sessions"
 	"github.com/ecumenos-social/network-warden/services/holders"
+	"github.com/ecumenos-social/network-warden/services/jwt"
 	smssender "github.com/ecumenos-social/network-warden/services/sms-sender"
 	"github.com/ecumenos-social/toolkitfx"
 	"github.com/ecumenos-social/toolkitfx/fxgrpc"
@@ -29,8 +29,8 @@ var Dependencies = fx.Options(
 		grpc.NewLivenessGateway,
 		grpc.NewHandler,
 		holders.New,
-		holdersessions.New,
 		auth.New,
+		jwt.New,
 		emailer.New,
 		smssender.New,
 	),

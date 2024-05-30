@@ -27,6 +27,10 @@ func (tn TemplateName) Validate() error {
 	return unknownTemplateName(tn)
 }
 
+func (tn TemplateName) String() string {
+	return string(tn)
+}
+
 func takeTemplate(name TemplateName) (*template.Template, error) {
 	if err := name.Validate(); err != nil {
 		return nil, errorwrapper.NewWithError(err)

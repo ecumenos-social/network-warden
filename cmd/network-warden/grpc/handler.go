@@ -2,15 +2,17 @@ package grpc
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strconv"
 
+	errorwrapper "github.com/ecumenos-social/error-wrapper"
 	"github.com/ecumenos-social/network-warden/models"
 	"github.com/ecumenos-social/network-warden/pkg/grpcutils"
 	"github.com/ecumenos-social/network-warden/services/auth"
 	"github.com/ecumenos-social/network-warden/services/emailer"
-	holdersessions "github.com/ecumenos-social/network-warden/services/holder-sessions"
 	"github.com/ecumenos-social/network-warden/services/holders"
+	"github.com/ecumenos-social/network-warden/services/jwt"
 	smssender "github.com/ecumenos-social/network-warden/services/sms-sender"
 	pbv1 "github.com/ecumenos-social/schemas/proto/gen/networkwarden/v1"
 	"github.com/ecumenos-social/toolkit/validators"
@@ -24,9 +26,9 @@ import (
 type Handler struct {
 	pbv1.NetworkWardenServiceServer
 
-	auth      auth.Service
+	jwt       jwt.Service
 	hs        holders.Service
-	hss       holdersessions.Service
+	auth      auth.Service
 	emailer   emailer.Service
 	smsSender smssender.Service
 	logger    *zap.Logger
@@ -38,8 +40,8 @@ type handlerParams struct {
 	fx.In
 
 	HoldersService        holders.Service
-	HolderSessionsService holdersessions.Service
-	AuthService           auth.Service
+	HolderSessionsService auth.Service
+	AuthService           jwt.Service
 	EmailerService        emailer.Service
 	SMSSenderService      smssender.Service
 	Logger                *zap.Logger
@@ -48,8 +50,8 @@ type handlerParams struct {
 func NewHandler(params handlerParams) *Handler {
 	return &Handler{
 		hs:        params.HoldersService,
-		hss:       params.HolderSessionsService,
-		auth:      params.AuthService,
+		auth:      params.HolderSessionsService,
+		jwt:       params.AuthService,
 		emailer:   params.EmailerService,
 		smsSender: params.SMSSenderService,
 		logger:    params.Logger,
@@ -83,7 +85,7 @@ func (h *Handler) CheckEmails(ctx context.Context, req *pbv1.CheckEmailsRequest)
 			errs = append(errs, err.Error())
 		}
 	}
-	if err := h.hs.CheckEmailsUsage(ctx, req.Emails); err != nil {
+	if err := h.hs.CheckEmailsUsage(ctx, logger, req.Emails); err != nil {
 		errs = append(errs, err.Error())
 	}
 
@@ -103,7 +105,7 @@ func (h *Handler) CheckPhoneNumbers(ctx context.Context, req *pbv1.CheckPhoneNum
 			errs = append(errs, err.Error())
 		}
 	}
-	if err := h.hs.CheckPhoneNumbersUsage(ctx, req.PhoneNumbers); err != nil {
+	if err := h.hs.CheckPhoneNumbersUsage(ctx, logger, req.PhoneNumbers); err != nil {
 		errs = append(errs, err.Error())
 	}
 
@@ -117,24 +119,22 @@ func (h *Handler) RegisterHolder(ctx context.Context, req *pbv1.RegisterHolderRe
 	logger := h.customizeLogger(ctx, "RegisterHolder")
 	defer logger.Info("request processed")
 
-	if err := h.validateRegisterHolderRequest(ctx, req); err != nil {
-		logger.Error("validation error", zap.Error(err))
+	if err := h.validateRegisterHolderRequest(ctx, logger, req); err != nil {
 		return nil, err
 	}
 
 	params := &holders.InsertParams{
-		Emails:      req.Emails,
-		PhoneNumber: req.PhoneNumbers,
-		Countries:   req.Countries,
-		Languages:   req.Languages,
-		Password:    req.Password,
+		Emails:       req.Emails,
+		PhoneNumbers: req.PhoneNumbers,
+		Countries:    req.Countries,
+		Languages:    req.Languages,
+		Password:     req.Password,
 	}
 	if req.AvatarImageUrl != "" {
 		params.AvatarImageURL = &req.AvatarImageUrl
 	}
-	holder, err := h.hs.Insert(ctx, params)
+	holder, err := h.hs.Insert(ctx, logger, params)
 	if err != nil {
-		logger.Error("insert holder error", zap.Error(err))
 		return nil, status.Errorf(codes.Internal, "failed create holder entity (error = %v)", err.Error())
 	}
 
@@ -142,9 +142,11 @@ func (h *Handler) RegisterHolder(ctx context.Context, req *pbv1.RegisterHolderRe
 	if err != nil {
 		return nil, err
 	}
-	approach, err := h.sendConfirmationMessage(ctx, holder)
-	if err != nil {
-		logger.Error("send confirmation message error", zap.Error(err))
+	approach := pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_PHONE_NUMBER
+	if len(holder.Emails) > 0 {
+		approach = pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_EMAIL
+	}
+	if err := h.sendConfirmationMessage(ctx, logger, approach, holder); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed send confirmation (error = %v)", err.Error())
 	}
 
@@ -156,13 +158,12 @@ func (h *Handler) RegisterHolder(ctx context.Context, req *pbv1.RegisterHolderRe
 }
 
 func (h *Handler) createSession(ctx context.Context, logger *zap.Logger, holderID int64, ip, mac string) (string, string, error) {
-	token, refreshToken, err := h.auth.CreateTokens(ctx, fmt.Sprint(holderID))
+	token, refreshToken, err := h.jwt.CreateTokens(ctx, logger, fmt.Sprint(holderID))
 	if err != nil {
-		logger.Error("create token pair error", zap.Error(err))
 		return "", "", status.Errorf(codes.Internal, "failed create tokens (error = %v)", err.Error())
 	}
 
-	_, err = h.hss.Insert(ctx, &holdersessions.InsertParams{
+	_, err = h.auth.Insert(ctx, logger, &auth.InsertParams{
 		HolderID:         holderID,
 		Token:            token,
 		RefreshToken:     refreshToken,
@@ -170,14 +171,13 @@ func (h *Handler) createSession(ctx context.Context, logger *zap.Logger, holderI
 		RemoteMACAddress: mac,
 	})
 	if err != nil {
-		logger.Error("insert holder session error", zap.Error(err))
 		return "", "", status.Errorf(codes.Internal, "failed create session (error = %v)", err.Error())
 	}
 
 	return token, refreshToken, nil
 }
 
-func (h *Handler) validateRegisterHolderRequest(ctx context.Context, req *pbv1.RegisterHolderRequest) error {
+func (h *Handler) validateRegisterHolderRequest(ctx context.Context, logger *zap.Logger, req *pbv1.RegisterHolderRequest) error {
 	if err := req.ValidateAll(); err != nil {
 		return status.Errorf(codes.InvalidArgument, "invalid request (error = %v)", err.Error())
 	}
@@ -190,7 +190,7 @@ func (h *Handler) validateRegisterHolderRequest(ctx context.Context, req *pbv1.R
 				return status.Errorf(codes.InvalidArgument, "invalid request, invalid email (email: %v, error = %v)", email, err.Error())
 			}
 		}
-		if err := h.hs.CheckEmailsUsage(ctx, req.Emails); err != nil {
+		if err := h.hs.CheckEmailsUsage(ctx, logger, req.Emails); err != nil {
 			return status.Errorf(codes.InvalidArgument, "invalid request, email in use (error = %v)", err.Error())
 		}
 	}
@@ -200,7 +200,7 @@ func (h *Handler) validateRegisterHolderRequest(ctx context.Context, req *pbv1.R
 				return status.Errorf(codes.InvalidArgument, "invalid request, invalid phone number (phone_number: %v, error = %v)", phoneNumber, err.Error())
 			}
 		}
-		if err := h.hs.CheckPhoneNumbersUsage(ctx, req.PhoneNumbers); err != nil {
+		if err := h.hs.CheckPhoneNumbersUsage(ctx, logger, req.PhoneNumbers); err != nil {
 			return status.Errorf(codes.InvalidArgument, "invalid request (error = %v)", err.Error())
 		}
 	}
@@ -218,23 +218,24 @@ func (h *Handler) validateRegisterHolderRequest(ctx context.Context, req *pbv1.R
 	return nil
 }
 
-func (h *Handler) sendConfirmationMessage(ctx context.Context, holder *models.Holder) (pbv1.ConfirmationApproach, error) {
-	if len(holder.Emails) > 0 {
-		if err := h.emailer.SendConfirmationOfRegistration(ctx, holder.Emails[0], holder.Emails[0], holder.ConfirmationCode); err != nil {
-			return pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_UNKNOWN_UNSPECIFIED, err
+func (h *Handler) sendConfirmationMessage(ctx context.Context, logger *zap.Logger, approach pbv1.ConfirmationApproach, holder *models.Holder) error {
+	if approach == pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_EMAIL {
+		if err := h.emailer.SendConfirmationOfRegistration(ctx, logger, holder.Emails[0], holder.Emails[0], holder.ConfirmationCode); err != nil {
+			return err
 		}
-		return pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_EMAIL, nil
+		return nil
+	}
+	if approach == pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_PHONE_NUMBER {
+		if err := h.smsSender.Send(ctx); err != nil {
+			return err
+		}
 	}
 
-	if err := h.smsSender.Send(ctx); err != nil {
-		return pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_UNKNOWN_UNSPECIFIED, err
-	}
-
-	return pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_PHONE_NUMBER, nil
+	return errorwrapper.New("unknown approach for sending confirmation of registration code")
 }
 
-func (h *Handler) parseToken(ctx context.Context, token, remoteMacAddress string, scope auth.TokenScope) (*models.HolderSession, error) {
-	t, err := h.auth.DecodeToken(token)
+func (h *Handler) parseToken(ctx context.Context, logger *zap.Logger, token, remoteMacAddress string, scope jwt.TokenScope) (*models.HolderSession, error) {
+	t, err := h.jwt.DecodeToken(logger, token)
 	if err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "invalid token")
 	}
@@ -247,14 +248,16 @@ func (h *Handler) parseToken(ctx context.Context, token, remoteMacAddress string
 		return nil, status.Errorf(codes.Unauthenticated, "invalid token, holder information is formatted incorrectly")
 	}
 
-	hs, err := h.hss.GetHolderSessionByToken(ctx, token, scope)
+	hs, err := h.auth.GetHolderSessionByToken(ctx, logger, token, scope)
 	if err != nil {
 		return nil, status.Error(codes.Unauthenticated, err.Error())
 	}
 	if hs.RemoteIPAddress.Valid && hs.RemoteIPAddress.String != grpcutils.ExtractRemoteIPAddress(ctx) {
+		logger.Error("remote IP address doesn't match with session's remote IP address", zap.String("session-remote-ip-address", hs.RemoteIPAddress.String), zap.String("incoming-remote-ip-address", grpcutils.ExtractRemoteIPAddress(ctx)))
 		return nil, status.Error(codes.PermissionDenied, "no permissions")
 	}
 	if hs.RemoteMACAddress.Valid && hs.RemoteMACAddress.String != remoteMacAddress {
+		logger.Error("remote MAC address doesn't match with session's remote MAC address", zap.String("session-remote-mac-address", hs.RemoteMACAddress.String), zap.String("incoming-remote-mac-address", remoteMacAddress))
 		return nil, status.Error(codes.PermissionDenied, "no permissions")
 	}
 
@@ -265,38 +268,68 @@ func (h *Handler) ConfirmHolderRegistration(ctx context.Context, req *pbv1.Confi
 	logger := h.customizeLogger(ctx, "ConfirmHolderRegistration")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, req.Token, req.RemoteMacAddress, auth.TokenScopeAccess)
+	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
 	if err != nil {
 		return nil, err
 	}
+	logger = logger.With(zap.Int64("holder-id", hs.HolderID))
+
 	logger = logger.With(zap.Int64("session-holder-id", hs.HolderID))
-	if _, err := h.hs.Confirm(ctx, hs.HolderID, req.ConfirmationCode); err != nil {
-		logger.Error("failed to confirm holder registration", zap.Error(err))
+	if _, err := h.hs.Confirm(ctx, logger, hs.HolderID, req.ConfirmationCode); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to confirm holder registration (err = %v)", err.Error())
 	}
 
 	return &pbv1.ConfirmHolderRegistrationResponse{Success: true}, nil
 }
 
-func (h *Handler) ResendConfirmationCode(ctx context.Context, _ *pbv1.ResendConfirmationCodeRequest) (*pbv1.ResendConfirmationCodeResponse, error) {
+func (h *Handler) ResendConfirmationCode(ctx context.Context, req *pbv1.ResendConfirmationCodeRequest) (*pbv1.ResendConfirmationCodeResponse, error) {
 	logger := h.customizeLogger(ctx, "ResendConfirmationCode")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("holder-id", hs.HolderID))
+
+	holder, err := h.hs.GetHolderByID(ctx, logger, hs.HolderID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get holder for resending confirmation code, err = %v", err.Error())
+	}
+	if holder == nil {
+		return nil, status.Error(codes.InvalidArgument, "can not found holder by token's information")
+	}
+	canSend, err := h.emailer.CanSendConfirmationOfRegistration(ctx, logger, holder.Emails[0])
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to verify if service can send confirmation code, err = %v", err.Error())
+	}
+	if !canSend {
+		return nil, status.Error(codes.InvalidArgument, "rate limit of sent emails was exceeded. please, try next time")
+	}
+
+	holder, err = h.hs.RegenerateConfirmationCode(ctx, logger, hs.HolderID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to regenerate confirmation code, err = %v", err.Error())
+	}
+	if err := h.sendConfirmationMessage(ctx, logger, req.ConfirmationApproach, holder); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed send confirmation (error = %v)", err.Error())
+	}
+
+	return &pbv1.ResendConfirmationCodeResponse{Success: true}, nil
 }
 
 func (h *Handler) LoginHolder(ctx context.Context, req *pbv1.LoginHolderRequest) (*pbv1.LoginHolderResponse, error) {
 	logger := h.customizeLogger(ctx, "LoginHolder")
 	defer logger.Info("request processed")
 
-	holder, err := h.hs.GetHolderByEmailOrPhoneNumber(ctx, req.Email, req.PhoneNumber)
+	holder, err := h.hs.GetHolderByEmailOrPhoneNumber(ctx, logger, req.Email, req.PhoneNumber)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed get holder, err=%v", err.Error())
 	}
 	if holder == nil {
 		return nil, status.Error(codes.InvalidArgument, "holder not found")
 	}
-	if err := h.hs.ValidatePassword(ctx, holder, req.Password); err != nil {
+	if err := h.hs.ValidatePassword(ctx, logger, holder, req.Password); err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid password")
 	}
 	token, refreshToken, err := h.createSession(ctx, logger, holder.ID, grpcutils.ExtractRemoteIPAddress(ctx), req.RemoteMacAddress)
@@ -314,12 +347,11 @@ func (h *Handler) LogoutHolder(ctx context.Context, req *pbv1.LogoutHolderReques
 	logger := h.customizeLogger(ctx, "LogoutHolder")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, req.Token, req.RemoteMacAddress, auth.TokenScopeAccess)
+	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
 	if err != nil {
 		return nil, err
 	}
-	if err := h.hss.MakeHolderSessionExpired(ctx, hs.HolderID, hs); err != nil {
-		logger.Error("make holder session expired error", zap.Error(err))
+	if err := h.auth.MakeHolderSessionExpired(ctx, logger, hs.HolderID, hs); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed modify session (error = %v)", err.Error())
 	}
 
@@ -330,21 +362,23 @@ func (h *Handler) RefreshHolderToken(ctx context.Context, req *pbv1.RefreshHolde
 	logger := h.customizeLogger(ctx, "RefreshHolderToken")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, req.RefreshToken, req.RemoteMacAddress, auth.TokenScopeRefresh)
+	hs, err := h.parseToken(ctx, logger, req.RefreshToken, req.RemoteMacAddress, jwt.TokenScopeRefresh)
 	if err != nil {
 		return nil, err
 	}
 
-	token, refreshToken, err := h.auth.CreateTokens(ctx, fmt.Sprint(hs.HolderID))
+	token, refreshToken, err := h.jwt.CreateTokens(ctx, logger, fmt.Sprint(hs.HolderID))
 	if err != nil {
-		logger.Error("create token pair error", zap.Error(err))
 		return nil, status.Errorf(codes.Internal, "failed create tokens (error = %v)", err.Error())
 	}
 
 	hs.Token = token
 	hs.RefreshToken = refreshToken
-	if err := h.hss.ModifyHolderSession(ctx, hs.HolderID, hs); err != nil {
-		logger.Error("modify holder session error", zap.Error(err))
+	hs.ExpiredAt = sql.NullTime{
+		Time:  h.auth.GetExpiredAtForHolderSession(),
+		Valid: true,
+	}
+	if err := h.auth.ModifyHolderSession(ctx, logger, hs.HolderID, hs); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed modify session (error = %v)", err.Error())
 	}
 

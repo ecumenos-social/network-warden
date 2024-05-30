@@ -272,7 +272,6 @@ func (r *Repository) ModifyHolderSession(ctx context.Context, id int64, holderSe
 	query := `update public.holder_sessions
   set created_at=$2, last_modified_at=$3, holder_id=$4, token=$5, refresh_token=$6, expired_at=$7, remote_ip_address=$8, remote_mac_address=$9
   where id=$1;`
-	// update public.admin_sessions set tombstoned = true where id=$1
 	params := []interface{}{
 		holderSession.ID, holderSession.CreatedAt, holderSession.LastModifiedAt,
 		holderSession.HolderID, holderSession.Token, holderSession.RefreshToken, holderSession.ExpiredAt,
@@ -280,4 +279,61 @@ func (r *Repository) ModifyHolderSession(ctx context.Context, id int64, holderSe
 	}
 	err := r.driver.ExecuteQuery(ctx, query, params...)
 	return err
+}
+
+func (r *Repository) InsertSentEmail(ctx context.Context, se *models.SentEmail) error {
+	query := `insert into public.sent_emails
+  (id, created_at, last_modified_at, sender_email, receiver_email, template_name)
+  values ($1, $2, $3, $4, $5, $6);`
+	params := []interface{}{se.ID, se.CreatedAt, se.LastModifiedAt, se.SenderEmail, se.ReceiverEmail, se.TemplateName}
+	err := r.driver.ExecuteQuery(ctx, query, params...)
+	return err
+}
+
+func (r *Repository) ModifySentEmail(ctx context.Context, id int64, se *models.SentEmail) error {
+	query := `update public.sent_emails
+  set created_at=$2, last_modified_at=$3, sender_email=$4, receiver_email=$5, template_name=$6
+  where id=$1;`
+	params := []interface{}{se.ID, se.CreatedAt, se.LastModifiedAt, se.SenderEmail, se.ReceiverEmail, se.TemplateName}
+	err := r.driver.ExecuteQuery(ctx, query, params...)
+	return err
+}
+
+func (r *Repository) scanSentEmail(rows scanner) (*models.SentEmail, error) {
+	var se models.SentEmail
+	err := rows.Scan(
+		&se.ID,
+		&se.CreatedAt,
+		&se.LastModifiedAt,
+		&se.SenderEmail,
+		&se.ReceiverEmail,
+		&se.TemplateName,
+	)
+	return &se, err
+}
+
+func (r *Repository) GetSentEmails(ctx context.Context, sender, receiver, templateName string) ([]*models.SentEmail, error) {
+	q := `
+  select
+    id, created_at, last_modified_at, sender_email, receiver_email, template_name
+  from public.sent_emails
+  where sender_email=$1 and receiver_email=$2 and template_name=$3;`
+	rows, err := r.driver.QueryRows(ctx, q, sender, receiver, templateName)
+	if err != nil {
+		return nil, err
+	}
+	var out []*models.SentEmail
+
+	for rows.Next() {
+		se, err := r.scanSentEmail(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, se)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }
