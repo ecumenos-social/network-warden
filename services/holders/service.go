@@ -35,6 +35,7 @@ type Service interface {
 	Confirm(ctx context.Context, logger *zap.Logger, id int64, confirmationCode string) (*models.Holder, error)
 	RegenerateConfirmationCode(ctx context.Context, logger *zap.Logger, id int64) (*models.Holder, error)
 	ChangePassword(ctx context.Context, logger *zap.Logger, holder *models.Holder, password string) error
+	Modify(ctx context.Context, logger *zap.Logger, holder *models.Holder, params *ModifyParams) (*models.Holder, error)
 }
 
 type service struct {
@@ -227,5 +228,33 @@ func (s *service) ChangePassword(ctx context.Context, logger *zap.Logger, holder
 		logger.Error("failed to modify holder to change password", zap.Error(err))
 		return err
 	}
+
 	return nil
+}
+
+type ModifyParams struct {
+	AvatarImageURL string
+	Countries      []string
+	Languages      []string
+}
+
+func (s *service) Modify(ctx context.Context, logger *zap.Logger, holder *models.Holder, params *ModifyParams) (*models.Holder, error) {
+	if params.AvatarImageURL != "" {
+		holder.AvatarImageURL = sql.NullString{
+			String: params.AvatarImageURL,
+			Valid:  true,
+		}
+	}
+	if params.Countries != nil {
+		holder.Countries = params.Countries
+	}
+	if params.Languages != nil {
+		holder.Languages = params.Languages
+	}
+	if err := s.repo.ModifyHolder(ctx, holder.ID, holder); err != nil {
+		logger.Error("failed to modify holder", zap.Error(err))
+		return nil, err
+	}
+
+	return holder, nil
 }

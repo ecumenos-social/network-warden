@@ -421,11 +421,35 @@ func (h *Handler) ChangeHolderPassword(ctx context.Context, req *pbv1.ChangeHold
 	return &pbv1.ChangeHolderPasswordResponse{Success: true}, nil
 }
 
-func (h *Handler) ModifyHolder(ctx context.Context, _ *pbv1.ModifyHolderRequest) (*pbv1.ModifyHolderResponse, error) {
+func (h *Handler) ModifyHolder(ctx context.Context, req *pbv1.ModifyHolderRequest) (*pbv1.ModifyHolderResponse, error) {
 	logger := h.customizeLogger(ctx, "ModifyHolder")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("holder-id", hs.HolderID))
+
+	holder, err := h.hs.GetHolderByID(ctx, logger, hs.HolderID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed get holder, err=%v", err.Error())
+	}
+	if holder == nil {
+		logger.Error("holder not found")
+		return nil, status.Error(codes.InvalidArgument, "holder not found")
+	}
+
+	params := &holders.ModifyParams{
+		AvatarImageURL: req.AvatarImageUrl,
+		Countries:      req.Countries,
+		Languages:      req.Languages,
+	}
+	if _, err := h.hs.Modify(ctx, logger, holder, params); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "failed to modify holder")
+	}
+
+	return &pbv1.ModifyHolderResponse{Success: true}, nil
 }
 
 func (h *Handler) GetHolder(ctx context.Context, _ *pbv1.GetHolderRequest) (*pbv1.GetHolderResponse, error) {
