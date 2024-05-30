@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/ecumenos-social/network-warden/models"
+	"github.com/ecumenos-social/network-warden/pkg/grpcutils"
 	"github.com/ecumenos-social/network-warden/services/auth"
 	"github.com/ecumenos-social/network-warden/services/emailer"
 	holdersessions "github.com/ecumenos-social/network-warden/services/holder-sessions"
@@ -18,7 +18,6 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 )
 
@@ -67,7 +66,7 @@ func (h *Handler) customizeLogger(ctx context.Context, operationName string) *za
 	if corrID := md.Get("correlation-id"); len(corrID) > 0 {
 		l = l.With(zap.String("correlation-id", corrID[0]))
 	}
-	if ip := extractRemoteIPAddress(ctx); ip != "" {
+	if ip := grpcutils.ExtractRemoteIPAddress(ctx); ip != "" {
 		l = l.With(zap.String("remote-ip-address", ip))
 	}
 
@@ -139,7 +138,7 @@ func (h *Handler) RegisterHolder(ctx context.Context, req *pbv1.RegisterHolderRe
 		return nil, status.Errorf(codes.Internal, "failed create holder entity (error = %v)", err.Error())
 	}
 
-	token, refreshToken, err := h.createSession(ctx, logger, holder.ID, extractRemoteIPAddress(ctx), req.RemoteMacAddress)
+	token, refreshToken, err := h.createSession(ctx, logger, holder.ID, grpcutils.ExtractRemoteIPAddress(ctx), req.RemoteMacAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -154,19 +153,6 @@ func (h *Handler) RegisterHolder(ctx context.Context, req *pbv1.RegisterHolderRe
 		RefreshToken:         refreshToken,
 		ConfirmationApproach: approach,
 	}, nil
-}
-
-func extractRemoteIPAddress(ctx context.Context) string {
-	p, ok := peer.FromContext(ctx)
-	if !ok {
-		return ""
-	}
-	ip := p.Addr.String()
-	if parts := strings.Split(ip, ":"); len(parts) > 0 {
-		return parts[0]
-	}
-
-	return ip
 }
 
 func (h *Handler) createSession(ctx context.Context, logger *zap.Logger, holderID int64, ip, mac string) (string, string, error) {
@@ -265,7 +251,7 @@ func (h *Handler) parseToken(ctx context.Context, token, remoteMacAddress string
 	if err != nil {
 		return nil, status.Error(codes.Unauthenticated, err.Error())
 	}
-	if hs.RemoteIPAddress.Valid && hs.RemoteIPAddress.String != extractRemoteIPAddress(ctx) {
+	if hs.RemoteIPAddress.Valid && hs.RemoteIPAddress.String != grpcutils.ExtractRemoteIPAddress(ctx) {
 		return nil, status.Error(codes.PermissionDenied, "no permissions")
 	}
 	if hs.RemoteMACAddress.Valid && hs.RemoteMACAddress.String != remoteMacAddress {
@@ -275,11 +261,21 @@ func (h *Handler) parseToken(ctx context.Context, token, remoteMacAddress string
 	return hs, nil
 }
 
-func (h *Handler) ConfirmHolderRegistration(ctx context.Context, _ *pbv1.ConfirmHolderRegistrationRequest) (*pbv1.ConfirmHolderRegistrationResponse, error) {
+func (h *Handler) ConfirmHolderRegistration(ctx context.Context, req *pbv1.ConfirmHolderRegistrationRequest) (*pbv1.ConfirmHolderRegistrationResponse, error) {
 	logger := h.customizeLogger(ctx, "ConfirmHolderRegistration")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	hs, err := h.parseToken(ctx, req.Token, req.RemoteMacAddress, auth.TokenScopeAccess)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("session-holder-id", hs.HolderID))
+	if _, err := h.hs.Confirm(ctx, hs.HolderID, req.ConfirmationCode); err != nil {
+		logger.Error("failed to confirm holder registration", zap.Error(err))
+		return nil, status.Errorf(codes.InvalidArgument, "failed to confirm holder registration (err = %v)", err.Error())
+	}
+
+	return &pbv1.ConfirmHolderRegistrationResponse{Success: true}, nil
 }
 
 func (h *Handler) ResendConfirmationCode(ctx context.Context, _ *pbv1.ResendConfirmationCodeRequest) (*pbv1.ResendConfirmationCodeResponse, error) {
@@ -303,7 +299,7 @@ func (h *Handler) LoginHolder(ctx context.Context, req *pbv1.LoginHolderRequest)
 	if err := h.hs.ValidatePassword(ctx, holder, req.Password); err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid password")
 	}
-	token, refreshToken, err := h.createSession(ctx, logger, holder.ID, extractRemoteIPAddress(ctx), req.RemoteMacAddress)
+	token, refreshToken, err := h.createSession(ctx, logger, holder.ID, grpcutils.ExtractRemoteIPAddress(ctx), req.RemoteMacAddress)
 	if err != nil {
 		return nil, err
 	}

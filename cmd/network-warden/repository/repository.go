@@ -143,6 +143,30 @@ func (r *Repository) GetHolderByPhoneNumber(ctx context.Context, phoneNumber str
 	return nil, err
 }
 
+func (r *Repository) GetHolderByID(ctx context.Context, id int64) (*models.Holder, error) {
+	q := `
+  select
+    id, created_at, last_modified_at, emails, phone_numbers, avatar_image_url,
+    countries, languages, password_hash, confirmed, confirmation_code
+  from public.holders
+  where id=$1;`
+	row, err := r.driver.QueryRow(ctx, q, id)
+	if err != nil {
+		return nil, err
+	}
+
+	h, err := r.scanHolder(row)
+	if err == nil {
+		return h, nil
+	}
+
+	if primitives.IsSameError(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+
+	return nil, err
+}
+
 func (r *Repository) InsertHolder(ctx context.Context, holder *models.Holder) error {
 	query := `insert into public.holders
   (id, created_at, last_modified_at, emails, phone_numbers, avatar_image_url, countries, languages, password_hash, confirmed, confirmation_code)
@@ -151,6 +175,19 @@ func (r *Repository) InsertHolder(ctx context.Context, holder *models.Holder) er
 		holder.ID, holder.CreatedAt, holder.LastModifiedAt,
 		holder.Emails, holder.PhoneNumbers, holder.AvatarImageURL, holder.Countries, holder.Languages,
 		holder.PasswordHash, holder.Confirmed, holder.ConfirmationCode,
+	}
+	err := r.driver.ExecuteQuery(ctx, query, params...)
+	return err
+}
+
+func (r *Repository) ModifyHolder(ctx context.Context, id int64, holder *models.Holder) error {
+	query := `update public.holders
+  set created_at=$2, last_modified_at=$3, emails=$4, phone_numbers=$5, avatar_image_url=$6, countries=$7, languages=$8, password_hash=$9, confirmed=$10, confirmation_code=$11
+  where id=$1;`
+	params := []interface{}{
+		holder.ID, holder.CreatedAt, holder.LastModifiedAt,
+		holder.Emails, holder.PhoneNumbers, holder.AvatarImageURL, holder.Countries,
+		holder.Languages, holder.PasswordHash, holder.Confirmed, holder.ConfirmationCode,
 	}
 	err := r.driver.ExecuteQuery(ctx, query, params...)
 	return err
