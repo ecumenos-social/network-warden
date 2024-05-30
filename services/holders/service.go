@@ -23,6 +23,7 @@ type Repository interface {
 	GetHolderByPhoneNumber(ctx context.Context, phoneNumber string) (*models.Holder, error)
 	GetHolderByID(ctx context.Context, id int64) (*models.Holder, error)
 	ModifyHolder(ctx context.Context, id int64, holder *models.Holder) error
+	DeleteHolder(ctx context.Context, id int64) error
 }
 
 type Service interface {
@@ -36,6 +37,7 @@ type Service interface {
 	RegenerateConfirmationCode(ctx context.Context, logger *zap.Logger, id int64) (*models.Holder, error)
 	ChangePassword(ctx context.Context, logger *zap.Logger, holder *models.Holder, password string) error
 	Modify(ctx context.Context, logger *zap.Logger, holder *models.Holder, params *ModifyParams) (*models.Holder, error)
+	Delete(ctx context.Context, logger *zap.Logger, id int64) error
 }
 
 type service struct {
@@ -257,4 +259,13 @@ func (s *service) Modify(ctx context.Context, logger *zap.Logger, holder *models
 	}
 
 	return holder, nil
+}
+
+func (s *service) Delete(ctx context.Context, logger *zap.Logger, id int64) error {
+	if err := s.repo.DeleteHolder(ctx, id); err != nil {
+		logger.Error("failed to delete holder", zap.Error(err))
+		return errorwrapper.WrapMessage(err, "failed to delete holder")
+	}
+
+	return nil
 }

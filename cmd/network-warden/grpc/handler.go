@@ -495,11 +495,33 @@ func convertHolderToProtoHolder(holder *models.Holder) *pbv1.Holder {
 	}
 }
 
-func (h *Handler) DeleteHolder(ctx context.Context, _ *pbv1.DeleteHolderRequest) (*pbv1.DeleteHolderResponse, error) {
+func (h *Handler) DeleteHolder(ctx context.Context, req *pbv1.DeleteHolderRequest) (*pbv1.DeleteHolderResponse, error) {
 	logger := h.customizeLogger(ctx, "DeleteHolder")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("holder-id", hs.HolderID))
+
+	holder, err := h.hs.GetHolderByID(ctx, logger, hs.HolderID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed get holder, err=%v", err.Error())
+	}
+	if holder == nil {
+		logger.Error("holder not found")
+		return nil, status.Error(codes.InvalidArgument, "holder not found")
+	}
+	if err := h.hs.ValidatePassword(ctx, logger, holder, req.Password); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid password")
+	}
+
+	if err := h.hs.Delete(ctx, logger, holder.ID); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to delete holder, err=%v", err.Error())
+	}
+
+	return &pbv1.DeleteHolderResponse{Success: true}, nil
 }
 
 func (h *Handler) GetPersonalDataNodesList(ctx context.Context, _ *pbv1.GetPersonalDataNodesListRequest) (*pbv1.GetPersonalDataNodesListResponse, error) {
