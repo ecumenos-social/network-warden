@@ -20,6 +20,8 @@ type Repository interface {
 	InsertHolder(ctx context.Context, holder *models.Holder) error
 	GetHolderByEmail(ctx context.Context, email string) (*models.Holder, error)
 	GetHolderByPhoneNumber(ctx context.Context, phoneNumber string) (*models.Holder, error)
+	GetHolderByID(ctx context.Context, id int64) (*models.Holder, error)
+	ModifyHolder(ctx context.Context, id int64, holder *models.Holder) error
 }
 
 type Service interface {
@@ -28,6 +30,8 @@ type Service interface {
 	Insert(ctx context.Context, params *InsertParams) (*models.Holder, error)
 	GetHolderByEmailOrPhoneNumber(ctx context.Context, email, phoneNumber string) (*models.Holder, error)
 	ValidatePassword(ctx context.Context, holder *models.Holder, password string) error
+	GetHolderByID(ctx context.Context, id int64) (*models.Holder, error)
+	Confirm(ctx context.Context, id int64, confirmationCode string) (*models.Holder, error)
 }
 
 type service struct {
@@ -129,4 +133,27 @@ func (s *service) ValidatePassword(_ context.Context, holder *models.Holder, pas
 	}
 
 	return errorwrapper.New("invalid password")
+}
+
+func (s *service) GetHolderByID(ctx context.Context, id int64) (*models.Holder, error) {
+	return s.repo.GetHolderByID(ctx, id)
+}
+
+func (s *service) Confirm(ctx context.Context, id int64, confirmationCode string) (*models.Holder, error) {
+	holder, err := s.repo.GetHolderByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if holder == nil {
+		return nil, err
+	}
+	if holder.ConfirmationCode != confirmationCode {
+		return nil, errorwrapper.New("invalid confirmation code")
+	}
+	holder.Confirmed = true
+	if err := s.repo.ModifyHolder(ctx, id, holder); err != nil {
+		return nil, err
+	}
+
+	return holder, nil
 }
