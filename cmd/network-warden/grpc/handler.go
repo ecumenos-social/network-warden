@@ -329,6 +329,8 @@ func (h *Handler) LoginHolder(ctx context.Context, req *pbv1.LoginHolderRequest)
 	if holder == nil {
 		return nil, status.Error(codes.InvalidArgument, "holder not found")
 	}
+	logger = logger.With(zap.Int64("holder-id", holder.ID))
+
 	if err := h.hs.ValidatePassword(ctx, logger, holder, req.Password); err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid password")
 	}
@@ -351,6 +353,8 @@ func (h *Handler) LogoutHolder(ctx context.Context, req *pbv1.LogoutHolderReques
 	if err != nil {
 		return nil, err
 	}
+	logger = logger.With(zap.Int64("holder-id", hs.HolderID))
+
 	if err := h.auth.MakeHolderSessionExpired(ctx, logger, hs.HolderID, hs); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed modify session (error = %v)", err.Error())
 	}
@@ -366,6 +370,7 @@ func (h *Handler) RefreshHolderToken(ctx context.Context, req *pbv1.RefreshHolde
 	if err != nil {
 		return nil, err
 	}
+	logger = logger.With(zap.Int64("holder-id", hs.HolderID))
 
 	token, refreshToken, err := h.jwt.CreateTokens(ctx, logger, fmt.Sprint(hs.HolderID))
 	if err != nil {
@@ -388,11 +393,32 @@ func (h *Handler) RefreshHolderToken(ctx context.Context, req *pbv1.RefreshHolde
 	}, nil
 }
 
-func (h *Handler) ChangeHolderPassword(ctx context.Context, _ *pbv1.ChangeHolderPasswordRequest) (*pbv1.ChangeHolderPasswordResponse, error) {
+func (h *Handler) ChangeHolderPassword(ctx context.Context, req *pbv1.ChangeHolderPasswordRequest) (*pbv1.ChangeHolderPasswordResponse, error) {
 	logger := h.customizeLogger(ctx, "ChangeHolderPassword")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("holder-id", hs.HolderID))
+
+	holder, err := h.hs.GetHolderByID(ctx, logger, hs.HolderID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed get holder, err=%v", err.Error())
+	}
+	if holder == nil {
+		logger.Error("holder not found")
+		return nil, status.Error(codes.InvalidArgument, "holder not found")
+	}
+	if err := h.hs.ValidatePassword(ctx, logger, holder, req.Password); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid password")
+	}
+	if err := h.hs.ChangePassword(ctx, logger, holder, req.NewPassword); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "failed to change holder's password")
+	}
+
+	return &pbv1.ChangeHolderPasswordResponse{Success: true}, nil
 }
 
 func (h *Handler) ModifyHolder(ctx context.Context, _ *pbv1.ModifyHolderRequest) (*pbv1.ModifyHolderResponse, error) {
