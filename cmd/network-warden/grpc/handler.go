@@ -452,11 +452,47 @@ func (h *Handler) ModifyHolder(ctx context.Context, req *pbv1.ModifyHolderReques
 	return &pbv1.ModifyHolderResponse{Success: true}, nil
 }
 
-func (h *Handler) GetHolder(ctx context.Context, _ *pbv1.GetHolderRequest) (*pbv1.GetHolderResponse, error) {
+func (h *Handler) GetHolder(ctx context.Context, req *pbv1.GetHolderRequest) (*pbv1.GetHolderResponse, error) {
 	logger := h.customizeLogger(ctx, "GetHolder")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("holder-id", hs.HolderID))
+
+	holderID, err := strconv.ParseInt(req.HolderId, 10, 64)
+	if err != nil {
+		logger.Error("invalid ID", zap.Error(err), zap.String("incoming-holder-id", req.HolderId))
+		return nil, status.Error(codes.InvalidArgument, "invalid ID")
+	}
+	holder, err := h.hs.GetHolderByID(ctx, logger, holderID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed get holder, err=%v", err.Error())
+	}
+	if holder == nil {
+		logger.Error("holder not found")
+		return nil, status.Error(codes.InvalidArgument, "holder not found")
+	}
+
+	return &pbv1.GetHolderResponse{Data: convertHolderToProtoHolder(holder)}, nil
+}
+
+func convertHolderToProtoHolder(holder *models.Holder) *pbv1.Holder {
+	var avatarImageURL string
+	if holder.AvatarImageURL.Valid {
+		avatarImageURL = holder.AvatarImageURL.String
+	}
+
+	return &pbv1.Holder{
+		Id:             fmt.Sprint(holder.ID),
+		Emails:         holder.Emails,
+		PhoneNumbers:   holder.PhoneNumbers,
+		AvatarImageUrl: avatarImageURL,
+		Countries:      holder.Countries,
+		Languages:      holder.Languages,
+	}
 }
 
 func (h *Handler) DeleteHolder(ctx context.Context, _ *pbv1.DeleteHolderRequest) (*pbv1.DeleteHolderResponse, error) {
