@@ -193,6 +193,12 @@ func (r *Repository) ModifyHolder(ctx context.Context, id int64, holder *models.
 	return err
 }
 
+func (r *Repository) DeleteHolder(ctx context.Context, id int64) error {
+	query := "delete from public.holders cascade where id=$1;"
+	err := r.driver.ExecuteQuery(ctx, query, id)
+	return err
+}
+
 func (r *Repository) InsertHolderSession(ctx context.Context, holderSession *models.HolderSession) error {
 	query := `insert into public.holder_sessions
   (id, created_at, last_modified_at, holder_id, token, refresh_token, expired_at, remote_ip_address, remote_mac_address)

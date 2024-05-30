@@ -22,7 +22,7 @@ create table public.holder_sessions
   id                 bigint primary key,
   created_at         timestamp(0) with time zone default current_timestamp not null,
   last_modified_at   timestamp(0) with time zone default current_timestamp not null,
-  holder_id          bigint references holders (id) not null,
+  holder_id          bigint references holders (id) on delete cascade not null,
   token              text not null,
   refresh_token      text not null,
   expired_at         timestamp(0) with time zone,
