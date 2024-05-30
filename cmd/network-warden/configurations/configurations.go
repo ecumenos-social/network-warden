@@ -4,7 +4,7 @@ import (
 	"github.com/ecumenos-social/network-warden/pkg/fxpostgres"
 	"github.com/ecumenos-social/network-warden/services/auth"
 	"github.com/ecumenos-social/network-warden/services/emailer"
-	holdersessions "github.com/ecumenos-social/network-warden/services/holder-sessions"
+	"github.com/ecumenos-social/network-warden/services/jwt"
 	smssender "github.com/ecumenos-social/network-warden/services/sms-sender"
 	"github.com/ecumenos-social/toolkitfx"
 	"github.com/ecumenos-social/toolkitfx/fxgrpc"
@@ -17,15 +17,15 @@ import (
 type fxConfig struct {
 	fx.Out
 
-	App           *toolkitfx.AppConfig
-	Logger        *fxlogger.Config
-	GRPC          *fxgrpc.Config
-	Postgres      *fxpostgres.Config
-	IDGenerator   *fxidgenerator.Config
-	Auth          *auth.Config
-	HolderSession *holdersessions.Config
-	Emailer       *emailer.Config
-	SMSSender     *smssender.Config
+	App         *toolkitfx.AppConfig
+	Logger      *fxlogger.Config
+	GRPC        *fxgrpc.Config
+	Postgres    *fxpostgres.Config
+	IDGenerator *fxidgenerator.Config
+	JWT         *jwt.Config
+	Auth        *auth.Config
+	Emailer     *emailer.Config
+	SMSSender   *smssender.Config
 }
 
 var Module = func(cctx *cli.Context) fx.Option {
@@ -70,13 +70,13 @@ var Module = func(cctx *cli.Context) fx.Option {
 					TopNodeID: cctx.Int64("nw-id-gen-top-node-id"),
 					LowNodeID: cctx.Int64("nw-id-gen-low-node-id"),
 				},
-				Auth: &auth.Config{
-					JWTSigningKey:   cctx.String("nw-auth-jwt-signing-key"),
-					TokenAge:        cctx.Duration("nw-auth-token-age"),
-					RefreshTokenAge: cctx.Duration("nw-auth-refresh-token-age"),
+				JWT: &jwt.Config{
+					SigningKey:      cctx.String("nw-jwt-signing-key"),
+					TokenAge:        cctx.Duration("nw-jwt-token-age"),
+					RefreshTokenAge: cctx.Duration("nw-jwt-refresh-token-age"),
 				},
-				HolderSession: &holdersessions.Config{
-					Age: cctx.Duration("nw-holder-session-age"),
+				Auth: &auth.Config{
+					SessionAge: cctx.Duration("nw-auth-session-age"),
 				},
 				Emailer: &emailer.Config{
 					SMTPHost:           cctx.String("nw-emailer-smtp-host"),

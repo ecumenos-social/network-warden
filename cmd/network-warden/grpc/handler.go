@@ -9,8 +9,8 @@ import (
 	"github.com/ecumenos-social/network-warden/pkg/grpcutils"
 	"github.com/ecumenos-social/network-warden/services/auth"
 	"github.com/ecumenos-social/network-warden/services/emailer"
-	holdersessions "github.com/ecumenos-social/network-warden/services/holder-sessions"
 	"github.com/ecumenos-social/network-warden/services/holders"
+	"github.com/ecumenos-social/network-warden/services/jwt"
 	smssender "github.com/ecumenos-social/network-warden/services/sms-sender"
 	pbv1 "github.com/ecumenos-social/schemas/proto/gen/networkwarden/v1"
 	"github.com/ecumenos-social/toolkit/validators"
@@ -24,9 +24,9 @@ import (
 type Handler struct {
 	pbv1.NetworkWardenServiceServer
 
-	auth      auth.Service
+	jwt       jwt.Service
 	hs        holders.Service
-	hss       holdersessions.Service
+	auth      auth.Service
 	emailer   emailer.Service
 	smsSender smssender.Service
 	logger    *zap.Logger
@@ -38,8 +38,8 @@ type handlerParams struct {
 	fx.In
 
 	HoldersService        holders.Service
-	HolderSessionsService holdersessions.Service
-	AuthService           auth.Service
+	HolderSessionsService auth.Service
+	AuthService           jwt.Service
 	EmailerService        emailer.Service
 	SMSSenderService      smssender.Service
 	Logger                *zap.Logger
@@ -48,8 +48,8 @@ type handlerParams struct {
 func NewHandler(params handlerParams) *Handler {
 	return &Handler{
 		hs:        params.HoldersService,
-		hss:       params.HolderSessionsService,
-		auth:      params.AuthService,
+		auth:      params.HolderSessionsService,
+		jwt:       params.AuthService,
 		emailer:   params.EmailerService,
 		smsSender: params.SMSSenderService,
 		logger:    params.Logger,
@@ -156,13 +156,13 @@ func (h *Handler) RegisterHolder(ctx context.Context, req *pbv1.RegisterHolderRe
 }
 
 func (h *Handler) createSession(ctx context.Context, logger *zap.Logger, holderID int64, ip, mac string) (string, string, error) {
-	token, refreshToken, err := h.auth.CreateTokens(ctx, fmt.Sprint(holderID))
+	token, refreshToken, err := h.jwt.CreateTokens(ctx, fmt.Sprint(holderID))
 	if err != nil {
 		logger.Error("create token pair error", zap.Error(err))
 		return "", "", status.Errorf(codes.Internal, "failed create tokens (error = %v)", err.Error())
 	}
 
-	_, err = h.hss.Insert(ctx, &holdersessions.InsertParams{
+	_, err = h.auth.Insert(ctx, &auth.InsertParams{
 		HolderID:         holderID,
 		Token:            token,
 		RefreshToken:     refreshToken,
@@ -233,8 +233,8 @@ func (h *Handler) sendConfirmationMessage(ctx context.Context, holder *models.Ho
 	return pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_PHONE_NUMBER, nil
 }
 
-func (h *Handler) parseToken(ctx context.Context, token, remoteMacAddress string, scope auth.TokenScope) (*models.HolderSession, error) {
-	t, err := h.auth.DecodeToken(token)
+func (h *Handler) parseToken(ctx context.Context, token, remoteMacAddress string, scope jwt.TokenScope) (*models.HolderSession, error) {
+	t, err := h.jwt.DecodeToken(token)
 	if err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "invalid token")
 	}
@@ -247,7 +247,7 @@ func (h *Handler) parseToken(ctx context.Context, token, remoteMacAddress string
 		return nil, status.Errorf(codes.Unauthenticated, "invalid token, holder information is formatted incorrectly")
 	}
 
-	hs, err := h.hss.GetHolderSessionByToken(ctx, token, scope)
+	hs, err := h.auth.GetHolderSessionByToken(ctx, token, scope)
 	if err != nil {
 		return nil, status.Error(codes.Unauthenticated, err.Error())
 	}
@@ -265,7 +265,7 @@ func (h *Handler) ConfirmHolderRegistration(ctx context.Context, req *pbv1.Confi
 	logger := h.customizeLogger(ctx, "ConfirmHolderRegistration")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, req.Token, req.RemoteMacAddress, auth.TokenScopeAccess)
+	hs, err := h.parseToken(ctx, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
 	if err != nil {
 		return nil, err
 	}
@@ -314,11 +314,11 @@ func (h *Handler) LogoutHolder(ctx context.Context, req *pbv1.LogoutHolderReques
 	logger := h.customizeLogger(ctx, "LogoutHolder")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, req.Token, req.RemoteMacAddress, auth.TokenScopeAccess)
+	hs, err := h.parseToken(ctx, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
 	if err != nil {
 		return nil, err
 	}
-	if err := h.hss.MakeHolderSessionExpired(ctx, hs.HolderID, hs); err != nil {
+	if err := h.auth.MakeHolderSessionExpired(ctx, hs.HolderID, hs); err != nil {
 		logger.Error("make holder session expired error", zap.Error(err))
 		return nil, status.Errorf(codes.Internal, "failed modify session (error = %v)", err.Error())
 	}
@@ -330,12 +330,12 @@ func (h *Handler) RefreshHolderToken(ctx context.Context, req *pbv1.RefreshHolde
 	logger := h.customizeLogger(ctx, "RefreshHolderToken")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, req.RefreshToken, req.RemoteMacAddress, auth.TokenScopeRefresh)
+	hs, err := h.parseToken(ctx, req.RefreshToken, req.RemoteMacAddress, jwt.TokenScopeRefresh)
 	if err != nil {
 		return nil, err
 	}
 
-	token, refreshToken, err := h.auth.CreateTokens(ctx, fmt.Sprint(hs.HolderID))
+	token, refreshToken, err := h.jwt.CreateTokens(ctx, fmt.Sprint(hs.HolderID))
 	if err != nil {
 		logger.Error("create token pair error", zap.Error(err))
 		return nil, status.Errorf(codes.Internal, "failed create tokens (error = %v)", err.Error())
@@ -343,7 +343,7 @@ func (h *Handler) RefreshHolderToken(ctx context.Context, req *pbv1.RefreshHolde
 
 	hs.Token = token
 	hs.RefreshToken = refreshToken
-	if err := h.hss.ModifyHolderSession(ctx, hs.HolderID, hs); err != nil {
+	if err := h.auth.ModifyHolderSession(ctx, hs.HolderID, hs); err != nil {
 		logger.Error("modify holder session error", zap.Error(err))
 		return nil, status.Errorf(codes.Internal, "failed modify session (error = %v)", err.Error())
 	}
