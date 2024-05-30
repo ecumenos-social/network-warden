@@ -2,6 +2,7 @@ package repository
 
 import (
 	"github.com/ecumenos-social/network-warden/services/auth"
+	"github.com/ecumenos-social/network-warden/services/emailer"
 	"github.com/ecumenos-social/network-warden/services/holders"
 	"go.uber.org/fx"
 )
@@ -11,5 +12,6 @@ var Module = fx.Options(
 		New,
 		func(r *Repository) holders.Repository { return holders.Repository(r) },
 		func(r *Repository) auth.Repository { return auth.Repository(r) },
+		func(r *Repository) emailer.Repository { return emailer.Repository(r) },
 	),
 )

@@ -12,6 +12,7 @@ import (
 	"github.com/ecumenos-social/network-warden/models"
 	"github.com/ecumenos-social/toolkit/hash"
 	"github.com/ecumenos-social/toolkit/random"
+	"go.uber.org/zap"
 )
 
 type Repository interface {
@@ -25,13 +26,13 @@ type Repository interface {
 }
 
 type Service interface {
-	CheckEmailsUsage(ctx context.Context, emails []string) error
-	CheckPhoneNumbersUsage(ctx context.Context, phoneNumbers []string) error
-	Insert(ctx context.Context, params *InsertParams) (*models.Holder, error)
-	GetHolderByEmailOrPhoneNumber(ctx context.Context, email, phoneNumber string) (*models.Holder, error)
-	ValidatePassword(ctx context.Context, holder *models.Holder, password string) error
-	GetHolderByID(ctx context.Context, id int64) (*models.Holder, error)
-	Confirm(ctx context.Context, id int64, confirmationCode string) (*models.Holder, error)
+	CheckEmailsUsage(ctx context.Context, logger *zap.Logger, emails []string) error
+	CheckPhoneNumbersUsage(ctx context.Context, logger *zap.Logger, phoneNumbers []string) error
+	Insert(ctx context.Context, logger *zap.Logger, params *InsertParams) (*models.Holder, error)
+	GetHolderByEmailOrPhoneNumber(ctx context.Context, logger *zap.Logger, email, phoneNumber string) (*models.Holder, error)
+	ValidatePassword(ctx context.Context, logger *zap.Logger, holder *models.Holder, password string) error
+	GetHolderByID(ctx context.Context, logger *zap.Logger, id int64) (*models.Holder, error)
+	Confirm(ctx context.Context, logger *zap.Logger, id int64, confirmationCode string) (*models.Holder, error)
 }
 
 type service struct {
@@ -46,25 +47,29 @@ func New(repo Repository, g idgenerator.Generator) Service {
 	}
 }
 
-func (s *service) CheckEmailsUsage(ctx context.Context, emails []string) error {
+func (s *service) CheckEmailsUsage(ctx context.Context, logger *zap.Logger, emails []string) error {
 	entities, err := s.repo.GetHoldersByEmails(ctx, emails)
 	if err != nil {
+		logger.Error("failed to get holders by emails", zap.Error(err))
 		return err
 	}
 	if len(entities) > 0 {
+		logger.Error("some email from emails list is in use", zap.Strings("emails", emails))
 		return errorwrapper.New(fmt.Sprintf("some email from emails list ([%s]) is in use", strings.Join(emails, ", ")))
 	}
 
 	return nil
 }
 
-func (s *service) CheckPhoneNumbersUsage(ctx context.Context, phoneNumbers []string) error {
+func (s *service) CheckPhoneNumbersUsage(ctx context.Context, logger *zap.Logger, phoneNumbers []string) error {
 	entities, err := s.repo.GetHoldersByPhoneNumbers(ctx, phoneNumbers)
 	if err != nil {
+		logger.Error("failed to get holders by phone numbers", zap.Error(err))
 		return err
 	}
 	if len(entities) > 0 {
-		return errorwrapper.New(fmt.Sprintf("some email from phone numbers list ([%s]) is in use", strings.Join(phoneNumbers, ", ")))
+		logger.Error("some phone number from phone numbers list is in use", zap.Strings("phone-numbers", phoneNumbers))
+		return errorwrapper.New(fmt.Sprintf("some phone number from phone numbers list ([%s]) is in use", strings.Join(phoneNumbers, ", ")))
 	}
 
 	return nil
@@ -72,25 +77,27 @@ func (s *service) CheckPhoneNumbersUsage(ctx context.Context, phoneNumbers []str
 
 type InsertParams struct {
 	Emails         []string
-	PhoneNumber    []string
+	PhoneNumbers   []string
 	AvatarImageURL *string
 	Countries      []string
 	Languages      []string
 	Password       string
 }
 
-func (s *service) Insert(ctx context.Context, params *InsertParams) (*models.Holder, error) {
+func (s *service) Insert(ctx context.Context, logger *zap.Logger, params *InsertParams) (*models.Holder, error) {
 	passwordHash, err := hash.Hash(params.Password)
 	if err != nil {
+		logger.Error("failed to hash password", zap.Error(err))
 		return nil, err
 	}
 
+	id := s.idgenerator.Generate().Int64()
 	h := &models.Holder{
-		ID:               s.idgenerator.Generate().Int64(),
+		ID:               id,
 		CreatedAt:        time.Now(),
 		LastModifiedAt:   time.Now(),
 		Emails:           params.Emails,
-		PhoneNumbers:     params.PhoneNumber,
+		PhoneNumbers:     params.PhoneNumbers,
 		Countries:        params.Countries,
 		Languages:        params.Languages,
 		PasswordHash:     passwordHash,
@@ -105,6 +112,15 @@ func (s *service) Insert(ctx context.Context, params *InsertParams) (*models.Hol
 	}
 
 	if err := s.repo.InsertHolder(ctx, h); err != nil {
+		logger.Error(
+			"failed to insert holder",
+			zap.Error(err),
+			zap.Int64("holder-id", id),
+			zap.Strings("emails", params.Emails),
+			zap.Strings("phone_numbers", params.PhoneNumbers),
+			zap.Strings("countries", params.Countries),
+			zap.Strings("languages", params.Languages),
+		)
 		return nil, err
 	}
 
@@ -115,43 +131,67 @@ func generateConfirmationCode() string {
 	return random.GenNumericString(10)
 }
 
-func (s *service) GetHolderByEmailOrPhoneNumber(ctx context.Context, email, phoneNumber string) (*models.Holder, error) {
+func (s *service) GetHolderByEmailOrPhoneNumber(ctx context.Context, logger *zap.Logger, email, phoneNumber string) (h *models.Holder, err error) {
 	if email == "" && phoneNumber == "" {
+		logger.Error("failed to hash password")
 		return nil, errorwrapper.New("can not query holder if email address is empty and phone number is empty")
 	}
 
 	if email != "" {
-		return s.repo.GetHolderByEmail(ctx, email)
+		h, err = s.repo.GetHolderByEmail(ctx, email)
+	} else {
+		h, err = s.repo.GetHolderByPhoneNumber(ctx, phoneNumber)
+	}
+	if err != nil {
+		logger.Error(
+			"failed to get holder",
+			zap.Error(err),
+			zap.String("email", email),
+			zap.String("phone-number", phoneNumber),
+		)
+		return nil, err
 	}
 
-	return s.repo.GetHolderByPhoneNumber(ctx, phoneNumber)
+	return h, nil
 }
 
-func (s *service) ValidatePassword(_ context.Context, holder *models.Holder, password string) error {
+func (s *service) ValidatePassword(_ context.Context, logger *zap.Logger, holder *models.Holder, password string) error {
 	if hash.CompareHash(password, holder.PasswordHash) {
 		return nil
 	}
+	logger.Error("invalid password")
 
 	return errorwrapper.New("invalid password")
 }
 
-func (s *service) GetHolderByID(ctx context.Context, id int64) (*models.Holder, error) {
-	return s.repo.GetHolderByID(ctx, id)
+func (s *service) GetHolderByID(ctx context.Context, logger *zap.Logger, id int64) (*models.Holder, error) {
+	h, err := s.repo.GetHolderByID(ctx, id)
+	if err != nil {
+		logger.Error("failed get holder by id", zap.Error(err), zap.Int64("holder-id", id))
+		return nil, err
+	}
+
+	return h, nil
 }
 
-func (s *service) Confirm(ctx context.Context, id int64, confirmationCode string) (*models.Holder, error) {
+func (s *service) Confirm(ctx context.Context, logger *zap.Logger, id int64, confirmationCode string) (*models.Holder, error) {
+	logger = logger.With(zap.Int64("holder-id", id))
 	holder, err := s.repo.GetHolderByID(ctx, id)
 	if err != nil {
+		logger.Error("failed to get holder by id", zap.Error(err))
 		return nil, err
 	}
 	if holder == nil {
-		return nil, err
+		logger.Error("holder is not found")
+		return nil, errorwrapper.New("holder is not found")
 	}
 	if holder.ConfirmationCode != confirmationCode {
+		logger.Error("invalid confirmation code")
 		return nil, errorwrapper.New("invalid confirmation code")
 	}
 	holder.Confirmed = true
 	if err := s.repo.ModifyHolder(ctx, id, holder); err != nil {
+		logger.Error("failed to modify holder to make confirm=true", zap.Error(err))
 		return nil, err
 	}
 

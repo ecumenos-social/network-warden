@@ -281,3 +281,15 @@ func (r *Repository) ModifyHolderSession(ctx context.Context, id int64, holderSe
 	err := r.driver.ExecuteQuery(ctx, query, params...)
 	return err
 }
+
+func (r *Repository) InsertSentEmail(ctx context.Context, sentEmail *models.SentEmail) error {
+	query := `insert into public.sent_emails
+  (id, created_at, last_modified_at, sender_email, receiver_email, template_name)
+  values ($1, $2, $3, $4, $5, $6);`
+	params := []interface{}{
+		sentEmail.ID, sentEmail.CreatedAt, sentEmail.LastModifiedAt,
+		sentEmail.SenderEmail, sentEmail.ReceiverEmail, sentEmail.TemplateName,
+	}
+	err := r.driver.ExecuteQuery(ctx, query, params...)
+	return err
+}

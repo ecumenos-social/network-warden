@@ -9,6 +9,7 @@ import (
 	idgenerator "github.com/ecumenos-social/id-generator"
 	"github.com/ecumenos-social/network-warden/models"
 	"github.com/ecumenos-social/network-warden/services/jwt"
+	"go.uber.org/zap"
 )
 
 type Config struct {
@@ -23,10 +24,11 @@ type Repository interface {
 }
 
 type Service interface {
-	Insert(ctx context.Context, params *InsertParams) (*models.HolderSession, error)
-	GetHolderSessionByToken(ctx context.Context, token string, scope jwt.TokenScope) (*models.HolderSession, error)
-	ModifyHolderSession(ctx context.Context, id int64, holderSession *models.HolderSession) error
-	MakeHolderSessionExpired(ctx context.Context, id int64, holderSession *models.HolderSession) error
+	Insert(ctx context.Context, logger *zap.Logger, params *InsertParams) (*models.HolderSession, error)
+	GetHolderSessionByToken(ctx context.Context, logger *zap.Logger, token string, scope jwt.TokenScope) (*models.HolderSession, error)
+	GetExpiredAtForHolderSession() time.Time
+	ModifyHolderSession(ctx context.Context, logger *zap.Logger, id int64, holderSession *models.HolderSession) error
+	MakeHolderSessionExpired(ctx context.Context, logger *zap.Logger, id int64, holderSession *models.HolderSession) error
 }
 
 type service struct {
@@ -51,9 +53,14 @@ type InsertParams struct {
 	RemoteMACAddress string
 }
 
-func (s *service) Insert(ctx context.Context, params *InsertParams) (*models.HolderSession, error) {
+func (s *service) Insert(ctx context.Context, logger *zap.Logger, params *InsertParams) (*models.HolderSession, error) {
+	id := s.idgenerator.Generate().Int64()
+	logger = logger.With(
+		zap.Int64("holder-session-id", id),
+		zap.Int64("holder-id", params.HolderID),
+	)
 	hs := &models.HolderSession{
-		ID:             s.idgenerator.Generate().Int64(),
+		ID:             id,
 		CreatedAt:      time.Now(),
 		LastModifiedAt: time.Now(),
 		HolderID:       params.HolderID,
@@ -74,13 +81,14 @@ func (s *service) Insert(ctx context.Context, params *InsertParams) (*models.Hol
 	}
 
 	if err := s.repo.InsertHolderSession(ctx, hs); err != nil {
+		logger.Info("failed to insert holder session", zap.Error(err))
 		return nil, err
 	}
 
 	return hs, nil
 }
 
-func (s *service) GetHolderSessionByToken(ctx context.Context, token string, scope jwt.TokenScope) (*models.HolderSession, error) {
+func (s *service) GetHolderSessionByToken(ctx context.Context, logger *zap.Logger, token string, scope jwt.TokenScope) (*models.HolderSession, error) {
 	var hs *models.HolderSession
 	var err error
 	switch scope {
@@ -90,34 +98,46 @@ func (s *service) GetHolderSessionByToken(ctx context.Context, token string, sco
 		hs, err = s.repo.GetHolderSessionByRefreshToken(ctx, token)
 	}
 	if err != nil {
+		logger.Info("failed to get holder session by token", zap.String("token-scope", scope.String()))
 		return nil, errorwrapper.WrapMessage(err, "failed to get session")
 	}
 	if hs == nil {
+		logger.Info("session is not found")
 		return nil, errorwrapper.New("session is not found")
 	}
 	if hs.ExpiredAt.Valid && hs.ExpiredAt.Time.Before(time.Now()) {
+		logger.Info("token was expired", zap.Time("expired-at", hs.ExpiredAt.Time))
 		return nil, errorwrapper.New("token was expired")
 	}
 
 	return hs, nil
 }
 
-func (s *service) ModifyHolderSession(ctx context.Context, id int64, holderSession *models.HolderSession) error {
-	holderSession.LastModifiedAt = time.Now()
-	holderSession.ExpiredAt = sql.NullTime{
-		Time:  time.Now().Add(s.sessionAge),
-		Valid: true,
-	}
-
-	return s.repo.ModifyHolderSession(ctx, id, holderSession)
+func (s *service) GetExpiredAtForHolderSession() time.Time {
+	return time.Now().Add(s.sessionAge)
 }
 
-func (s *service) MakeHolderSessionExpired(ctx context.Context, id int64, holderSession *models.HolderSession) error {
+func (s *service) ModifyHolderSession(ctx context.Context, logger *zap.Logger, id int64, holderSession *models.HolderSession) error {
+	logger = logger.With(
+		zap.Int64("holder-session-id", id),
+		zap.Int64("holder-id", holderSession.HolderID),
+	)
+	holderSession.LastModifiedAt = time.Now()
+
+	if err := s.repo.ModifyHolderSession(ctx, id, holderSession); err != nil {
+		logger.Error("failed to modify holder session", zap.Error(err))
+		return err
+	}
+
+	return nil
+}
+
+func (s *service) MakeHolderSessionExpired(ctx context.Context, logger *zap.Logger, id int64, holderSession *models.HolderSession) error {
 	holderSession.LastModifiedAt = time.Now()
 	holderSession.ExpiredAt = sql.NullTime{
 		Time:  time.Now(),
 		Valid: true,
 	}
 
-	return s.repo.ModifyHolderSession(ctx, id, holderSession)
+	return s.ModifyHolderSession(ctx, logger, id, holderSession)
 }
