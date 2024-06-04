@@ -8,11 +8,12 @@ import (
 	"github.com/ecumenos-social/network-warden/services/auth"
 	"github.com/ecumenos-social/network-warden/services/emailer"
 	"github.com/ecumenos-social/network-warden/services/holders"
+	"github.com/ecumenos-social/network-warden/services/idgenerators"
 	"github.com/ecumenos-social/network-warden/services/jwt"
+	networknodes "github.com/ecumenos-social/network-warden/services/network-nodes"
 	smssender "github.com/ecumenos-social/network-warden/services/sms-sender"
 	"github.com/ecumenos-social/toolkitfx"
 	"github.com/ecumenos-social/toolkitfx/fxgrpc"
-	"github.com/ecumenos-social/toolkitfx/fxidgenerator"
 	"github.com/ecumenos-social/toolkitfx/fxlogger"
 	"go.uber.org/fx"
 )
@@ -22,7 +23,6 @@ var Dependencies = fx.Options(
 	fxlogger.Module,
 	fxpostgres.Module,
 	repository.Module,
-	fxidgenerator.Module,
 	fx.Provide(
 		grpc.NewGRPCServer,
 		grpc.NewHTTPGatewayHandler,
@@ -33,6 +33,11 @@ var Dependencies = fx.Options(
 		jwt.New,
 		emailer.New,
 		smssender.New,
+		networknodes.New,
+		idgenerators.NewHolderSessionsIDGenerator,
+		idgenerators.NewHoldersIDGenerator,
+		idgenerators.NewNetworkNodesIDGenerator,
+		idgenerators.NewSentEmailsIDGenerator,
 	),
 )
 

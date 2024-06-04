@@ -43,10 +43,10 @@ github.com/ecumenos-social/id-generator v0.0.3 h1:hNh0mOLAoSAWbc6taEBSY5701l4uUk
 github.com/ecumenos-social/id-generator v0.0.3/go.mod h1:wCWZYOTJbdjqSQiWPdLRCrIQudqDBBn5/CXTnw5UPfA=
 github.com/ecumenos-social/schemas v0.0.14 h1:CPm9rUYpMKORTMo7ImzQlgwTWlQKTMywvKY6qpZqhBg=
 github.com/ecumenos-social/schemas v0.0.14/go.mod h1:yhQTZ0KM0vo3I9ozfsC19du6lg9kkRJPU6X+Uc0dj3o=
-github.com/ecumenos-social/toolkit v0.0.2 h1:cFTjUlO5J+HEEMU6JW+OZir1yatPeMYo0HNsAMbYs4Y=
-github.com/ecumenos-social/toolkit v0.0.2/go.mod h1:om/rsggY8Phf3rsY1eKVydVDUuTdsDZwdN5ji7b3JgA=
-github.com/ecumenos-social/toolkitfx v0.0.7 h1:4sFdNaxNDvrLZQjwsZs68nxjxwB8J115aR5eyapIu8k=
-github.com/ecumenos-social/toolkitfx v0.0.7/go.mod h1:1PrR5N00h72NJdzAmGltKyz/61BOpNR72cWwiFtz6RU=
+github.com/ecumenos-social/toolkit v0.0.3 h1:/nfnr8dBmCx85sYJ/TmdFM08CxQ4mahgRhF6CuvL5aA=
+github.com/ecumenos-social/toolkit v0.0.3/go.mod h1:om/rsggY8Phf3rsY1eKVydVDUuTdsDZwdN5ji7b3JgA=
+github.com/ecumenos-social/toolkitfx v0.0.8 h1:KG1FPZsGyrn6LLTRhXT8fY9sOrCguXGelYc2/wGHqtc=
+github.com/ecumenos-social/toolkitfx v0.0.8/go.mod h1:F0cXrLCIm8DXJwZXrjUS7gcuQoXucnoVI4H6qMSMHgU=
 github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.1-0.20191026205805-5f8ba28d4473/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.4/go.mod h1:6rpuAdCZL397s3pYoYcLgu1mIlRU8Am5FuJP05cCM98=

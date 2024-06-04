@@ -13,9 +13,11 @@ import (
 	"github.com/ecumenos-social/network-warden/services/emailer"
 	"github.com/ecumenos-social/network-warden/services/holders"
 	"github.com/ecumenos-social/network-warden/services/jwt"
+	networknodes "github.com/ecumenos-social/network-warden/services/network-nodes"
 	smssender "github.com/ecumenos-social/network-warden/services/sms-sender"
 	pbv1 "github.com/ecumenos-social/schemas/proto/gen/networkwarden/v1"
 	"github.com/ecumenos-social/toolkit/validators"
+	"github.com/ecumenos-social/toolkitfx"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -26,12 +28,15 @@ import (
 type Handler struct {
 	pbv1.NetworkWardenServiceServer
 
-	jwt       jwt.Service
-	hs        holders.Service
-	auth      auth.Service
-	emailer   emailer.Service
-	smsSender smssender.Service
-	logger    *zap.Logger
+	jwt                 jwt.Service
+	hs                  holders.Service
+	auth                auth.Service
+	emailer             emailer.Service
+	smsSender           smssender.Service
+	networkNodesService networknodes.Service
+	logger              *zap.Logger
+
+	networkWardenID int64
 }
 
 var _ pbv1.NetworkWardenServiceServer = (*Handler)(nil)
@@ -39,22 +44,27 @@ var _ pbv1.NetworkWardenServiceServer = (*Handler)(nil)
 type handlerParams struct {
 	fx.In
 
+	Config                *toolkitfx.AppConfig
 	HoldersService        holders.Service
 	HolderSessionsService auth.Service
 	AuthService           jwt.Service
 	EmailerService        emailer.Service
 	SMSSenderService      smssender.Service
+	NetworkNodesService   networknodes.Service
 	Logger                *zap.Logger
 }
 
 func NewHandler(params handlerParams) *Handler {
 	return &Handler{
-		hs:        params.HoldersService,
-		auth:      params.HolderSessionsService,
-		jwt:       params.AuthService,
-		emailer:   params.EmailerService,
-		smsSender: params.SMSSenderService,
-		logger:    params.Logger,
+		hs:                  params.HoldersService,
+		auth:                params.HolderSessionsService,
+		jwt:                 params.AuthService,
+		emailer:             params.EmailerService,
+		smsSender:           params.SMSSenderService,
+		networkNodesService: params.NetworkNodesService,
+		logger:              params.Logger,
+
+		networkWardenID: params.Config.ID,
 	}
 }
 
@@ -64,7 +74,10 @@ func (h *Handler) customizeLogger(ctx context.Context, operationName string) *za
 		return h.logger
 	}
 
-	l := h.logger.With(zap.String("operation-name", operationName))
+	l := h.logger.With(
+		zap.String("operation-name", operationName),
+		zap.Int64("network-warden-id", h.networkWardenID),
+	)
 	if corrID := md.Get("correlation-id"); len(corrID) > 0 {
 		l = l.With(zap.String("correlation-id", corrID[0]))
 	}
@@ -552,11 +565,36 @@ func (h *Handler) GetNetworkNodesList(ctx context.Context, _ *pbv1.GetNetworkNod
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) JoinNetworkNodeRegistrationWaitlist(ctx context.Context, _ *pbv1.JoinNetworkNodeRegistrationWaitlistRequest) (*pbv1.JoinNetworkNodeRegistrationWaitlistResponse, error) {
+func (h *Handler) JoinNetworkNodeRegistrationWaitlist(ctx context.Context, req *pbv1.JoinNetworkNodeRegistrationWaitlistRequest) (*pbv1.JoinNetworkNodeRegistrationWaitlistResponse, error) {
 	logger := h.customizeLogger(ctx, "JoinNetworkNodeRegistrationWaitlist")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("holder-id", hs.HolderID))
+
+	nn, err := h.networkNodesService.Insert(ctx, logger, &networknodes.InsertParams{
+		HolderID:        hs.HolderID,
+		NetworkWardenID: h.networkWardenID,
+		Name:            req.Name,
+		Description:     req.Description,
+		DomainName:      req.DomainName,
+		Location: &models.Location{
+			Longitude: req.Location.Longitude,
+			Latitude:  req.Location.Latitude,
+		},
+		URL: req.Url,
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to insert network node, err = %v", err.Error())
+	}
+
+	return &pbv1.JoinNetworkNodeRegistrationWaitlistResponse{
+		Success: true,
+		Id:      fmt.Sprint(nn.ID),
+	}, nil
 }
 
 func (h *Handler) RegisterNetworkNode(ctx context.Context, _ *pbv1.RegisterNetworkNodeRequest) (*pbv1.RegisterNetworkNodeResponse, error) {
