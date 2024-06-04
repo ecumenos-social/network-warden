@@ -343,3 +343,110 @@ func (r *Repository) GetSentEmails(ctx context.Context, sender, receiver, templa
 
 	return out, nil
 }
+
+func (r *Repository) InsertNetworkNode(ctx context.Context, nn *models.NetworkNode) error {
+	query := `insert into public.network_nodes
+  (id, created_at, last_modified_at, network_warden_id, holder_id, name, description, domain_name, location,
+   accounts_capacity, alive, last_pinged_at, is_open, url, api_key_hash, version,
+   rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node)
+  values ($1, $2, $3, $4, $5, $6, $7, $8, ST_SetSRID(ST_MakePoint($9, $10), 4326), $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23);`
+	params := []interface{}{
+		nn.ID, nn.CreatedAt, nn.LastModifiedAt, nn.NetworkWardenID, nn.HolderID, nn.Name, nn.Description, nn.DomainName, nn.Location.Longitude, nn.Location.Latitude,
+		nn.AccountsCapacity, nn.Alive, nn.LastPingedAt, nn.IsOpen, nn.URL, nn.APIKeyHash, nn.Version,
+		nn.RateLimitMaxRequests, nn.RateLimitInterval, nn.CrawlRateLimitMaxRequests, nn.CrawlRateLimitInterval, nn.Status, nn.IDGenNode,
+	}
+	err := r.driver.ExecuteQuery(ctx, query, params...)
+	return err
+}
+
+func (r *Repository) scanNetworkNode(rows scanner) (*models.NetworkNode, error) {
+	var (
+		nn       models.NetworkNode
+		location models.Location
+	)
+	err := rows.Scan(
+		&nn.ID,
+		&nn.CreatedAt,
+		&nn.LastModifiedAt,
+		&nn.NetworkWardenID,
+		&nn.HolderID,
+		&nn.Name,
+		&nn.Description,
+		&nn.DomainName,
+		&location.Longitude,
+		&location.Latitude,
+		&nn.AccountsCapacity,
+		&nn.Alive,
+		&nn.LastPingedAt,
+		&nn.IsOpen,
+		&nn.URL,
+		&nn.APIKeyHash,
+		&nn.Version,
+		&nn.RateLimitMaxRequests,
+		&nn.RateLimitInterval,
+		&nn.CrawlRateLimitMaxRequests,
+		&nn.CrawlRateLimitInterval,
+		&nn.Status,
+		&nn.IDGenNode,
+	)
+	if err != nil {
+		return nil, err
+	}
+	nn.Location = &location
+
+	return &nn, nil
+}
+
+func (r *Repository) GetNetworkNodesByHolderID(ctx context.Context, holderID int64, limit, offset int64) ([]*models.NetworkNode, error) {
+	q := `
+  select
+    id, created_at, last_modified_at, network_warden_id, holder_id, name, description, domain_name, ST_X(location::geometry), ST_Y(location::geometry),
+    accounts_capacity, alive, last_pinged_at, is_open, url, api_key_hash, version,
+    rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node
+  from public.network_nodes
+  where holder_id=$1
+  limit $2 offset $3;`
+	rows, err := r.driver.QueryRows(ctx, q, holderID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	var out []*models.NetworkNode
+
+	for rows.Next() {
+		nn, err := r.scanNetworkNode(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, nn)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func (r *Repository) GetNetworkNodesByDomainName(ctx context.Context, domainName string) (*models.NetworkNode, error) {
+	q := `
+  select
+    id, created_at, last_modified_at, network_warden_id, holder_id, name, description, domain_name, ST_X(location::geometry), ST_Y(location::geometry),
+    accounts_capacity, alive, last_pinged_at, is_open, url, api_key_hash, version,
+    rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node
+  from public.network_nodes
+  where domain_name=$1;`
+	row, err := r.driver.QueryRow(ctx, q, domainName)
+	if err != nil {
+		return nil, err
+	}
+
+	nn, err := r.scanNetworkNode(row)
+	if err == nil {
+		return nn, nil
+	}
+
+	if primitives.IsSameError(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+
+	return nil, err
+}

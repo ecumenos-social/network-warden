@@ -1,17 +1,17 @@
-version: "3.8"
+version: '3.8'
+
 services:
   postgres:
-    image: "postgres:14"
+    image: postgis/postgis:latest
+    container_name: postgres
+    environment:
+      POSTGRES_USER: ecumenosuser
+      POSTGRES_PASSWORD: rootpassword
+      POSTGRES_DB: ecumenos_network_warden_db
     ports:
       - "5432:5432"
     volumes:
-      - db:/var/lib/postgresql/data
-    restart: always
-    environment:
-      POSTGRES_PASSWORD: rootpassword
-      POSTGRES_USER: ecumenosuser
-      POSTGRES_DB: ecumenos_network_warden_db
+      - postgres_data:/var/lib/postgresql/data
 
 volumes:
-  db:
-    driver: local
+  postgres_data:

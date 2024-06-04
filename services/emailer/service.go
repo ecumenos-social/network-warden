@@ -10,9 +10,9 @@ import (
 	"time"
 
 	errorwrapper "github.com/ecumenos-social/error-wrapper"
-	idgenerator "github.com/ecumenos-social/id-generator"
 	"github.com/ecumenos-social/network-warden/models"
 	"github.com/ecumenos-social/network-warden/pkg/sliceutils"
+	"github.com/ecumenos-social/network-warden/services/idgenerators"
 	"go.uber.org/zap"
 )
 
@@ -44,10 +44,10 @@ type service struct {
 	rateLimits         map[TemplateName]*RateLimit
 
 	repo        Repository
-	idgenerator idgenerator.Generator
+	idgenerator idgenerators.SentEmailsIDGenerator
 }
 
-func New(config *Config, repo Repository, g idgenerator.Generator) Service {
+func New(config *Config, repo Repository, g idgenerators.SentEmailsIDGenerator) Service {
 	return &service{
 		smtpAddr: net.JoinHostPort(config.SMTPHost, config.SMTPPort),
 		smtpAuth: smtp.PlainAuth(

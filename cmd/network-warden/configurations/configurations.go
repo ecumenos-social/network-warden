@@ -4,11 +4,12 @@ import (
 	"github.com/ecumenos-social/network-warden/pkg/fxpostgres"
 	"github.com/ecumenos-social/network-warden/services/auth"
 	"github.com/ecumenos-social/network-warden/services/emailer"
+	"github.com/ecumenos-social/network-warden/services/idgenerators"
 	"github.com/ecumenos-social/network-warden/services/jwt"
 	smssender "github.com/ecumenos-social/network-warden/services/sms-sender"
+	"github.com/ecumenos-social/toolkit/types"
 	"github.com/ecumenos-social/toolkitfx"
 	"github.com/ecumenos-social/toolkitfx/fxgrpc"
-	"github.com/ecumenos-social/toolkitfx/fxidgenerator"
 	"github.com/ecumenos-social/toolkitfx/fxlogger"
 	cli "github.com/urfave/cli/v2"
 	"go.uber.org/fx"
@@ -17,15 +18,18 @@ import (
 type fxConfig struct {
 	fx.Out
 
-	App         *toolkitfx.AppConfig
-	Logger      *fxlogger.Config
-	GRPC        *fxgrpc.Config
-	Postgres    *fxpostgres.Config
-	IDGenerator *fxidgenerator.Config
-	JWT         *jwt.Config
-	Auth        *auth.Config
-	Emailer     *emailer.Config
-	SMSSender   *smssender.Config
+	App                       *toolkitfx.AppConfig
+	Logger                    *fxlogger.Config
+	GRPC                      *fxgrpc.Config
+	Postgres                  *fxpostgres.Config
+	HolderSessionsIDGenerator *idgenerators.HolderSessionsIDGeneratorConfig
+	HoldersIDGenerator        *idgenerators.HoldersIDGeneratorConfig
+	SentEmailsIDGenerator     *idgenerators.SentEmailsIDGeneratorConfig
+	NetworkNodesIDGenerator   *idgenerators.NetworkNodesIDGeneratorConfig
+	JWT                       *jwt.Config
+	Auth                      *auth.Config
+	Emailer                   *emailer.Config
+	SMSSender                 *smssender.Config
 }
 
 var Module = func(cctx *cli.Context) fx.Option {
@@ -33,9 +37,11 @@ var Module = func(cctx *cli.Context) fx.Option {
 		fx.Provide(func() fxConfig {
 			return fxConfig{
 				App: &toolkitfx.AppConfig{
+					ID:          cctx.Int64("nw-app-id"),
+					IDGenNode:   cctx.Int64("nw-app-id-gen-node"),
 					Name:        cctx.String("nw-app-name"),
 					Description: cctx.String("nw-app-description"),
-					RateLimit:   cctx.Float64("nw-app-rate-limit"),
+					RateLimit:   &types.RateLimit{MaxRequests: cctx.Int64("nw-app-rate-limit-max-requests"), Interval: cctx.Duration("nw-app-rate-limit-interval")},
 				},
 				Logger: &fxlogger.Config{
 					Production: cctx.Bool("nw-logger-production"),
@@ -66,9 +72,21 @@ var Module = func(cctx *cli.Context) fx.Option {
 					URL:            cctx.String("nw-postgres-url"),
 					MigrationsPath: cctx.String("nw-postgres-migrations-path"),
 				},
-				IDGenerator: &fxidgenerator.Config{
-					TopNodeID: cctx.Int64("nw-id-gen-top-node-id"),
-					LowNodeID: cctx.Int64("nw-id-gen-low-node-id"),
+				HolderSessionsIDGenerator: &idgenerators.HolderSessionsIDGeneratorConfig{
+					TopNodeID: cctx.Int64("nw-app-id-gen-node"),
+					LowNodeID: 0,
+				},
+				HoldersIDGenerator: &idgenerators.HoldersIDGeneratorConfig{
+					TopNodeID: cctx.Int64("nw-app-id-gen-node"),
+					LowNodeID: 0,
+				},
+				SentEmailsIDGenerator: &idgenerators.SentEmailsIDGeneratorConfig{
+					TopNodeID: cctx.Int64("nw-app-id-gen-node"),
+					LowNodeID: 0,
+				},
+				NetworkNodesIDGenerator: &idgenerators.NetworkNodesIDGeneratorConfig{
+					TopNodeID: cctx.Int64("nw-app-id-gen-node"),
+					LowNodeID: 0,
 				},
 				JWT: &jwt.Config{
 					SigningKey:      cctx.String("nw-jwt-signing-key"),

@@ -7,6 +7,18 @@ import (
 )
 
 var Flags = []cli.Flag{
+	&cli.Int64Flag{
+		Name:    "nw-app-id",
+		Usage:   "it is application ID",
+		Value:   0,
+		EnvVars: []string{"NETWORK_WARDEN_APP_ID"},
+	},
+	&cli.Int64Flag{
+		Name:    "nw-app-id-gen-node",
+		Usage:   "it is application ID generation node",
+		Value:   0,
+		EnvVars: []string{"NETWORK_WARDEN_APP_ID_GEN_NODE"},
+	},
 	&cli.StringFlag{
 		Name:    "nw-app-name",
 		Usage:   "it is unique application name",
@@ -19,11 +31,17 @@ var Flags = []cli.Flag{
 		Value:   "it is network warden",
 		EnvVars: []string{"NETWORK_WARDEN_APP_DESCRIPTION"},
 	},
-	&cli.Float64Flag{
-		Name:    "nw-app-rate-limit",
-		Usage:   "it is rate limit",
-		Value:   0.1,
-		EnvVars: []string{"NETWORK_WARDEN_APP_RATE_LIMIT"},
+	&cli.Int64Flag{
+		Name:    "nw-app-rate-limit-max-requests",
+		Usage:   "it is rate limit max requests amount",
+		Value:   1000,
+		EnvVars: []string{"NETWORK_WARDEN_APP_RATE_LIMIT_MAX_REQUESTS"},
+	},
+	&cli.DurationFlag{
+		Name:    "nw-app-rate-limit-interval",
+		Usage:   "it is rate limit interval",
+		Value:   time.Minute,
+		EnvVars: []string{"NETWORK_WARDEN_APP_RATE_LIMIT_INTERVAL"},
 	},
 	&cli.BoolFlag{
 		Name:    "nw-logger-production",
@@ -114,18 +132,6 @@ var Flags = []cli.Flag{
 		Usage:   "it is path to directory with postgres migrations",
 		Value:   `file://cmd/network-warden/pgmigrations`,
 		EnvVars: []string{"NETWORK_WARDEN_POSTGRES_MIGRATIONS_PATH"},
-	},
-	&cli.Int64Flag{
-		Name:    "nw-id-gen-top-node-id",
-		Usage:   "it is id generator top level node seed",
-		Value:   10,
-		EnvVars: []string{"NETWORK_WARDEN_ID_GENERATOR_TOP_NODE_ID"},
-	},
-	&cli.Int64Flag{
-		Name:    "nw-id-gen-low-node-id",
-		Usage:   "it is id generator low level node seed",
-		Value:   10,
-		EnvVars: []string{"NETWORK_WARDEN_ID_GENERATOR_LOW_NODE_ID"},
 	},
 	&cli.StringFlag{
 		Name:    "nw-jwt-signing-key",

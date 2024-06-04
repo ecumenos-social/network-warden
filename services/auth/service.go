@@ -6,8 +6,8 @@ import (
 	"time"
 
 	errorwrapper "github.com/ecumenos-social/error-wrapper"
-	idgenerator "github.com/ecumenos-social/id-generator"
 	"github.com/ecumenos-social/network-warden/models"
+	"github.com/ecumenos-social/network-warden/services/idgenerators"
 	"github.com/ecumenos-social/network-warden/services/jwt"
 	"go.uber.org/zap"
 )
@@ -34,10 +34,10 @@ type Service interface {
 type service struct {
 	sessionAge  time.Duration
 	repo        Repository
-	idgenerator idgenerator.Generator
+	idgenerator idgenerators.HolderSessionsIDGenerator
 }
 
-func New(config *Config, repo Repository, g idgenerator.Generator) Service {
+func New(config *Config, repo Repository, g idgenerators.HolderSessionsIDGenerator) Service {
 	return &service{
 		sessionAge:  config.SessionAge,
 		repo:        repo,

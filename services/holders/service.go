@@ -8,8 +8,8 @@ import (
 	"time"
 
 	errorwrapper "github.com/ecumenos-social/error-wrapper"
-	idgenerator "github.com/ecumenos-social/id-generator"
 	"github.com/ecumenos-social/network-warden/models"
+	"github.com/ecumenos-social/network-warden/services/idgenerators"
 	"github.com/ecumenos-social/toolkit/hash"
 	"github.com/ecumenos-social/toolkit/random"
 	"go.uber.org/zap"
@@ -42,10 +42,10 @@ type Service interface {
 
 type service struct {
 	repo        Repository
-	idgenerator idgenerator.Generator
+	idgenerator idgenerators.HoldersIDGenerator
 }
 
-func New(repo Repository, g idgenerator.Generator) Service {
+func New(repo Repository, g idgenerators.HoldersIDGenerator) Service {
 	return &service{
 		repo:        repo,
 		idgenerator: g,
