@@ -26,7 +26,7 @@ type Repository interface {
 
 type Service interface {
 	Insert(ctx context.Context, logger *zap.Logger, params *InsertParams) (*models.NetworkNode, error)
-	Confirm(ctx context.Context, logger *zap.Logger, holderID, id int64, confirmationCode string) (nn *models.NetworkNode, apiKey string, err error)
+	Confirm(ctx context.Context, logger *zap.Logger, holderID, id int64) (nn *models.NetworkNode, apiKey string, err error)
 	GetList(ctx context.Context, logger *zap.Logger, holderID int64, pagination *types.Pagination, onlyMy bool) ([]*models.NetworkNode, error)
 }
 
@@ -108,7 +108,7 @@ func (s *service) Insert(ctx context.Context, logger *zap.Logger, params *Insert
 	return nn, nil
 }
 
-func (s *service) Confirm(ctx context.Context, logger *zap.Logger, holderID, id int64, confirmationCode string) (*models.NetworkNode, string, error) {
+func (s *service) Confirm(ctx context.Context, logger *zap.Logger, holderID, id int64) (*models.NetworkNode, string, error) {
 	nn, err := s.repo.GetNetworkNodesByID(ctx, id)
 	if err != nil {
 		logger.Error("failed to get network node by id", zap.Error(err))

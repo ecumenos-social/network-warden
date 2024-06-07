@@ -235,15 +235,15 @@ func (s *service) ChangePassword(ctx context.Context, logger *zap.Logger, holder
 }
 
 type ModifyParams struct {
-	AvatarImageURL string
+	AvatarImageURL *string
 	Countries      []string
 	Languages      []string
 }
 
 func (s *service) Modify(ctx context.Context, logger *zap.Logger, holder *models.Holder, params *ModifyParams) (*models.Holder, error) {
-	if params.AvatarImageURL != "" {
+	if params.AvatarImageURL != nil {
 		holder.AvatarImageURL = sql.NullString{
-			String: params.AvatarImageURL,
+			String: *params.AvatarImageURL,
 			Valid:  true,
 		}
 	}

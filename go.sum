@@ -41,8 +41,8 @@ github.com/ecumenos-social/grpc-utils v0.0.1 h1:tH7X8sW7+tfjM2bOUjIYmzFnuX2eNA0/
 github.com/ecumenos-social/grpc-utils v0.0.1/go.mod h1:os4xHtcifDCUwxQT5wbWGi2tCwjDAT79zFQHZZ3dz6M=
 github.com/ecumenos-social/id-generator v0.0.3 h1:hNh0mOLAoSAWbc6taEBSY5701l4uUkutj/1bEvuJlJU=
 github.com/ecumenos-social/id-generator v0.0.3/go.mod h1:wCWZYOTJbdjqSQiWPdLRCrIQudqDBBn5/CXTnw5UPfA=
-github.com/ecumenos-social/schemas v0.0.15 h1:kzVURNGxQeuE63z1bgQLSpV+Ab7SfrN2EizLRpa2wnk=
-github.com/ecumenos-social/schemas v0.0.15/go.mod h1:yhQTZ0KM0vo3I9ozfsC19du6lg9kkRJPU6X+Uc0dj3o=
+github.com/ecumenos-social/schemas v0.0.16 h1:T0Jhq2PkadkH55XsHbsY6Hz2tkXkLUka0TiIIPJDABM=
+github.com/ecumenos-social/schemas v0.0.16/go.mod h1:yhQTZ0KM0vo3I9ozfsC19du6lg9kkRJPU6X+Uc0dj3o=
 github.com/ecumenos-social/toolkit v0.0.4 h1:9/DY7Ij4+/97zuzvWFANrn8XRasWaKXmN3cYbHz7otM=
 github.com/ecumenos-social/toolkit v0.0.4/go.mod h1:om/rsggY8Phf3rsY1eKVydVDUuTdsDZwdN5ji7b3JgA=
 github.com/ecumenos-social/toolkitfx v0.0.8 h1:KG1FPZsGyrn6LLTRhXT8fY9sOrCguXGelYc2/wGHqtc=
@@ -207,6 +207,8 @@ github.com/rs/zerolog v1.13.0/go.mod h1:YbFCdg8HfsridGWAh22vktObvhZbQsZXe4/zB0OK
 github.com/rs/zerolog v1.15.0/go.mod h1:xYTKnLHcpfU2225ny5qZjxnj9NvkumZYjJHlAThCjNc=
 github.com/russross/blackfriday/v2 v2.1.0 h1:JIOH55/0cWyOuilr9/qlrm0BSXldqnqwMsf35Ld67mk=
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
+github.com/samber/lo v1.39.0 h1:4gTz1wUhNYLhFSKl6O+8peW0v2F4BCY034GRpU9WnuA=
+github.com/samber/lo v1.39.0/go.mod h1:+m/ZKRl6ClXCE2Lgf3MsQlWfh4bn1bz6CXEOxnEXnEA=
 github.com/satori/go.uuid v1.2.0/go.mod h1:dA0hQrYB0VpLJoorglMZABFdXlWrHn1NEOzdhQKdks0=
 github.com/segmentio/asm v1.2.0 h1:9BQrFxC+YOHJlTlHGkTrFWf59nbL3XnCoFLTwDCI7ys=
 github.com/segmentio/asm v1.2.0/go.mod h1:BqMnlJP91P8d+4ibuonYZw9mfnzI9HfxselHZr5aAcs=
@@ -272,6 +274,8 @@ golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97/go.mod h1:GvvjBRRGRdwPK5y
 golang.org/x/crypto v0.23.0 h1:dIJU/v2J8Mdglj/8rJ6UUOM3Zc9zLZxVZwwxMooUSAI=
 golang.org/x/crypto v0.23.0/go.mod h1:CKFgDieR+mRhux2Lsu27y0fO304Db0wZe70UKqHu0v8=
 golang.org/x/exp v0.0.0-20190121172915-509febef88a4/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
+golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 h1:k/i9J1pBpvlfR+9QsetwPyERsqu1GIbi967PQMq3Ivc=
+golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1/go.mod h1:V1LtkGg67GoY2N1AnLN78QLrzxkLyJw7RJb1gzOOz9w=
 golang.org/x/lint v0.0.0-20181026193005-c67002cb31c3/go.mod h1:UVdnD1Gm6xHRNCYTkRU2/jEulfH38KcIWyp/GAMgvoE=
 golang.org/x/lint v0.0.0-20190227174305-5b3e6a55c961/go.mod h1:wehouNa3lNwaWXcvxsM5YxQ5yQlVC4a0KAMCusXpPoU=
 golang.org/x/lint v0.0.0-20190313153728-d0100b6bd8b3/go.mod h1:6SW0HCj/g11FgYtHlgUYUwCkIfeOF89ocIRzGO/8vkc=
