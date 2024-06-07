@@ -6,7 +6,7 @@ require (
 	github.com/ecumenos-social/error-wrapper v0.0.1
 	github.com/ecumenos-social/grpc-utils v0.0.1
 	github.com/ecumenos-social/id-generator v0.0.3
-	github.com/ecumenos-social/schemas v0.0.14
+	github.com/ecumenos-social/schemas v0.0.15
 	github.com/ecumenos-social/toolkit v0.0.4
 	github.com/ecumenos-social/toolkitfx v0.0.8
 	github.com/golang-migrate/migrate/v4 v4.17.1
@@ -19,6 +19,7 @@ require (
 	go.uber.org/fx v1.21.1
 	go.uber.org/zap v1.27.0
 	google.golang.org/grpc v1.64.0
+	google.golang.org/protobuf v1.34.1
 )
 
 require (
@@ -64,7 +65,6 @@ require (
 	golang.org/x/tools v0.15.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240515191416-fc5f0ca64291 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240515191416-fc5f0ca64291 // indirect
-	google.golang.org/protobuf v1.34.1 // indirect
 	gopkg.in/DATA-DOG/go-sqlmock.v1 v1.3.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

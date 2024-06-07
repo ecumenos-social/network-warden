@@ -15,7 +15,10 @@ import (
 	"github.com/ecumenos-social/network-warden/services/jwt"
 	networknodes "github.com/ecumenos-social/network-warden/services/network-nodes"
 	smssender "github.com/ecumenos-social/network-warden/services/sms-sender"
+	"github.com/ecumenos-social/schemas/formats"
+	v1 "github.com/ecumenos-social/schemas/proto/gen/common/v1"
 	pbv1 "github.com/ecumenos-social/schemas/proto/gen/networkwarden/v1"
+	"github.com/ecumenos-social/toolkit/types"
 	"github.com/ecumenos-social/toolkit/validators"
 	"github.com/ecumenos-social/toolkitfx"
 	"go.uber.org/fx"
@@ -23,6 +26,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 type Handler struct {
@@ -558,11 +562,104 @@ func (h *Handler) RegisterPersonalDataNode(ctx context.Context, _ *pbv1.Register
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) GetNetworkNodesList(ctx context.Context, _ *pbv1.GetNetworkNodesListRequest) (*pbv1.GetNetworkNodesListResponse, error) {
+func (h *Handler) GetNetworkNodesList(ctx context.Context, req *pbv1.GetNetworkNodesListRequest) (*pbv1.GetNetworkNodesListResponse, error) {
 	logger := h.customizeLogger(ctx, "GetNetworkNodesList")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	if req.Token == "" && req.OnlyMy {
+		return nil, status.Error(codes.InvalidArgument, "token is required if only_my filter is used")
+	}
+	var holderID int64
+	if req.Token != "" {
+		hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
+		if err != nil {
+			return nil, err
+		}
+		logger = logger.With(zap.Int64("holder-id", hs.HolderID))
+		holderID = hs.HolderID
+	}
+
+	pagination := types.NewPagination(nil, nil)
+	if req.Limit > 0 {
+		pagination.SetLimit(req.Limit)
+	}
+	if req.Offset >= 0 {
+		pagination.SetOffset(req.Offset)
+	}
+	nns, err := h.networkNodesService.GetList(ctx, logger, holderID, pagination, req.OnlyMy)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get network nodes list")
+	}
+	data := make([]*pbv1.NetworkNode, 0, len(nns))
+	for _, nn := range nns {
+		data = append(data, convertNetworkNodeToProtoNetworkNode(nn))
+	}
+
+	return &pbv1.GetNetworkNodesListResponse{
+		Data: data,
+	}, nil
+}
+
+func convertNetworkNodeToProtoNetworkNode(nn *models.NetworkNode) *pbv1.NetworkNode {
+	var lastPingedAt string
+	if nn.LastPingedAt.Valid {
+		lastPingedAt = formats.FormatDateTime(nn.LastPingedAt.Time)
+	}
+	var status pbv1.NetworkNode_Status
+	switch nn.Status {
+	case models.NetworkNodeStatusApproved:
+		status = pbv1.NetworkNode_STATUS_APPROVED
+	case models.NetworkNodeStatusPending:
+		status = pbv1.NetworkNode_STATUS_PENDING
+	case models.NetworkNodeStatusRejected:
+		status = pbv1.NetworkNode_STATUS_REJECTED
+	}
+
+	return &pbv1.NetworkNode{
+		Id:               fmt.Sprint(nn.ID),
+		CreatedAt:        formats.FormatDateTime(nn.CreatedAt),
+		LastModifiedAt:   formats.FormatDateTime(nn.LastModifiedAt),
+		NwId:             fmt.Sprint(nn.NetworkWardenID),
+		Name:             nn.Name,
+		DomainName:       nn.DomainName,
+		Location:         convertLocationToProtoLocation(nn.Location),
+		AccountsCapacity: nn.AccountsCapacity,
+		Alive:            nn.Alive,
+		LastPingedAt:     lastPingedAt,
+		IsOpen:           nn.IsOpen,
+		OwnerHolderId:    fmt.Sprint(nn.HolderID),
+		Url:              nn.URL,
+		Version:          nn.Version,
+		RateLimit: convertRateLimitToProtoRateLimit(&types.RateLimit{
+			MaxRequests: nn.RateLimitMaxRequests,
+			Interval:    nn.RateLimitInterval,
+		}),
+		CrawlRateLimit: convertRateLimitToProtoRateLimit(&types.RateLimit{
+			MaxRequests: nn.CrawlRateLimitMaxRequests,
+			Interval:    nn.CrawlRateLimitInterval,
+		}),
+		Status: status,
+	}
+}
+
+func convertLocationToProtoLocation(l *models.Location) *v1.Geolocation {
+	if l == nil {
+		return nil
+	}
+	return &v1.Geolocation{
+		Latitude:  l.Latitude,
+		Longitude: l.Longitude,
+	}
+}
+
+func convertRateLimitToProtoRateLimit(rl *types.RateLimit) *v1.RateLimit {
+	if rl == nil {
+		return nil
+	}
+	return &v1.RateLimit{
+		MaxRequests: rl.MaxRequests,
+		Interval:    durationpb.New(rl.Interval),
+	}
 }
 
 func (h *Handler) JoinNetworkNodeRegistrationWaitlist(ctx context.Context, req *pbv1.JoinNetworkNodeRegistrationWaitlistRequest) (*pbv1.JoinNetworkNodeRegistrationWaitlistResponse, error) {
