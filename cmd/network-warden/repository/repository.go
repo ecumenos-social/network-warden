@@ -8,6 +8,7 @@ import (
 	"github.com/ecumenos-social/network-warden/models"
 	"github.com/ecumenos-social/network-warden/pkg/fxpostgres"
 	"github.com/ecumenos-social/toolkit/primitives"
+	"github.com/ecumenos-social/toolkit/types"
 	"github.com/jackc/pgx/v4"
 )
 
@@ -412,16 +413,29 @@ func (r *Repository) scanNetworkNode(rows scanner) (*models.NetworkNode, error) 
 	return &nn, nil
 }
 
-func (r *Repository) GetNetworkNodesByHolderID(ctx context.Context, holderID int64, limit, offset int64) ([]*models.NetworkNode, error) {
-	q := `
+func (r *Repository) GetNetworkNodesList(ctx context.Context, filters map[string]interface{}, pagination *types.Pagination) ([]*models.NetworkNode, error) {
+	var (
+		whereStatements = make([]string, 0, len(filters))
+		args            = make([]interface{}, 0, len(filters)+2)
+	)
+	args = append(args, pagination.GetLimit(), pagination.GetOffset())
+
+	for field, value := range filters {
+		args = append(args, value)
+		whereStatements = append(whereStatements, field+"=$"+fmt.Sprint(len(args)))
+	}
+	var whereStatement string
+	if len(whereStatements) > 0 {
+		whereStatement = "where " + strings.Join(whereStatements, ", ")
+	}
+
+	q := fmt.Sprintf(`
   select
     id, created_at, last_modified_at, network_warden_id, holder_id, name, description, domain_name, ST_X(location::geometry), ST_Y(location::geometry),
     accounts_capacity, alive, last_pinged_at, is_open, url, api_key_hash, version,
     rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node
-  from public.network_nodes
-  where holder_id=$1
-  limit $2 offset $3;`
-	rows, err := r.driver.QueryRows(ctx, q, holderID, limit, offset)
+  from public.network_nodes %s limit $1 offset $2;`, whereStatement)
+	rows, err := r.driver.QueryRows(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}

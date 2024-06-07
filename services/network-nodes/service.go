@@ -11,6 +11,7 @@ import (
 	"github.com/ecumenos-social/network-warden/services/idgenerators"
 	"github.com/ecumenos-social/toolkit/hash"
 	"github.com/ecumenos-social/toolkit/random"
+	"github.com/ecumenos-social/toolkit/types"
 	"github.com/ecumenos-social/toolkitfx"
 	"go.uber.org/zap"
 )
@@ -20,11 +21,13 @@ type Repository interface {
 	GetNetworkNodesByDomainName(ctx context.Context, domainName string) (*models.NetworkNode, error)
 	GetNetworkNodesByID(ctx context.Context, id int64) (*models.NetworkNode, error)
 	ModifyNetworkNode(ctx context.Context, id int64, nn *models.NetworkNode) error
+	GetNetworkNodesList(ctx context.Context, filters map[string]interface{}, pagination *types.Pagination) ([]*models.NetworkNode, error)
 }
 
 type Service interface {
 	Insert(ctx context.Context, logger *zap.Logger, params *InsertParams) (*models.NetworkNode, error)
 	Confirm(ctx context.Context, logger *zap.Logger, holderID, id int64, confirmationCode string) (nn *models.NetworkNode, apiKey string, err error)
+	GetList(ctx context.Context, logger *zap.Logger, holderID int64, pagination *types.Pagination, onlyMy bool) ([]*models.NetworkNode, error)
 }
 
 type service struct {
@@ -133,4 +136,13 @@ func (s *service) Confirm(ctx context.Context, logger *zap.Logger, holderID, id 
 	}
 
 	return nn, apiKey, nil
+}
+
+func (s *service) GetList(ctx context.Context, logger *zap.Logger, holderID int64, pagination *types.Pagination, onlyMy bool) ([]*models.NetworkNode, error) {
+	filters := make(map[string]interface{}, 1)
+	if onlyMy {
+		filters["holder_id"] = holderID
+	}
+
+	return s.repo.GetNetworkNodesList(ctx, filters, pagination)
 }
