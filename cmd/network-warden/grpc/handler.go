@@ -597,11 +597,31 @@ func (h *Handler) JoinNetworkNodeRegistrationWaitlist(ctx context.Context, req *
 	}, nil
 }
 
-func (h *Handler) RegisterNetworkNode(ctx context.Context, _ *pbv1.RegisterNetworkNodeRequest) (*pbv1.RegisterNetworkNodeResponse, error) {
+func (h *Handler) RegisterNetworkNode(ctx context.Context, req *pbv1.RegisterNetworkNodeRequest) (*pbv1.RegisterNetworkNodeResponse, error) {
 	logger := h.customizeLogger(ctx, "RegisterNetworkNode")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("holder-id", hs.HolderID))
+	id, err := strconv.ParseInt(req.Id, 10, 64)
+	if err != nil {
+		logger.Error("invalid network node ID", zap.Error(err), zap.String("incoming-network-node-id", req.Id))
+		return nil, status.Error(codes.InvalidArgument, "invalid network node ID")
+	}
+
+	_, apiKey, err := h.networkNodesService.Confirm(ctx, logger, hs.HolderID, id, req.Code)
+	if err != nil {
+		logger.Error("failed to confirm", zap.Error(err), zap.String("incoming-network-node-id", req.Id))
+		return nil, status.Error(codes.Internal, "failed to confirm")
+	}
+
+	return &pbv1.RegisterNetworkNodeResponse{
+		Success: true,
+		ApiKey:  apiKey,
+	}, nil
 }
 
 func (h *Handler) GetNetworkWardensList(ctx context.Context, _ *pbv1.GetNetworkWardensListRequest) (*pbv1.GetNetworkWardensListResponse, error) {

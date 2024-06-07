@@ -9,27 +9,35 @@ import (
 	errorwrapper "github.com/ecumenos-social/error-wrapper"
 	"github.com/ecumenos-social/network-warden/models"
 	"github.com/ecumenos-social/network-warden/services/idgenerators"
+	"github.com/ecumenos-social/toolkit/hash"
+	"github.com/ecumenos-social/toolkit/random"
+	"github.com/ecumenos-social/toolkitfx"
 	"go.uber.org/zap"
 )
 
 type Repository interface {
 	InsertNetworkNode(ctx context.Context, nn *models.NetworkNode) error
 	GetNetworkNodesByDomainName(ctx context.Context, domainName string) (*models.NetworkNode, error)
+	GetNetworkNodesByID(ctx context.Context, id int64) (*models.NetworkNode, error)
+	ModifyNetworkNode(ctx context.Context, id int64, nn *models.NetworkNode) error
 }
 
 type Service interface {
 	Insert(ctx context.Context, logger *zap.Logger, params *InsertParams) (*models.NetworkNode, error)
+	Confirm(ctx context.Context, logger *zap.Logger, holderID, id int64, confirmationCode string) (nn *models.NetworkNode, apiKey string, err error)
 }
 
 type service struct {
-	repo        Repository
-	idgenerator idgenerators.NetworkNodesIDGenerator
+	repo            Repository
+	idgenerator     idgenerators.NetworkNodesIDGenerator
+	networkWardenID int64
 }
 
-func New(repo Repository, g idgenerators.NetworkNodesIDGenerator) Service {
+func New(config *toolkitfx.AppConfig, repo Repository, g idgenerators.NetworkNodesIDGenerator) Service {
 	return &service{
-		repo:        repo,
-		idgenerator: g,
+		repo:            repo,
+		idgenerator:     g,
+		networkWardenID: config.ID,
 	}
 }
 
@@ -95,4 +103,34 @@ func (s *service) Insert(ctx context.Context, logger *zap.Logger, params *Insert
 	}
 
 	return nn, nil
+}
+
+func (s *service) Confirm(ctx context.Context, logger *zap.Logger, holderID, id int64, confirmationCode string) (*models.NetworkNode, string, error) {
+	nn, err := s.repo.GetNetworkNodesByID(ctx, id)
+	if err != nil {
+		logger.Error("failed to get network node by id", zap.Error(err))
+		return nil, "", err
+	}
+	if nn == nil {
+		logger.Error("network node is not found")
+		return nil, "", errorwrapper.New("network node is not found")
+	}
+	if nn.HolderID != holderID {
+		logger.Error("have no permissions for confirm network node")
+		return nil, "", errorwrapper.New("have no permissions for confirm network node")
+	}
+
+	apiKey, err := random.GenAPIKey("nn", fmt.Sprint(s.networkWardenID))
+	if err != nil {
+		logger.Error("failed to generate API key", zap.Error(err))
+		return nil, "", err
+	}
+	nn.APIKeyHash = hash.SHA1(apiKey)
+
+	if err := s.repo.ModifyNetworkNode(ctx, id, nn); err != nil {
+		logger.Error("failed to modify network node", zap.Error(err))
+		return nil, "", errorwrapper.New("failed to modify network node")
+	}
+
+	return nn, apiKey, nil
 }
