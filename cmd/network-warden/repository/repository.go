@@ -359,6 +359,21 @@ func (r *Repository) InsertNetworkNode(ctx context.Context, nn *models.NetworkNo
 	return err
 }
 
+func (r *Repository) ModifyNetworkNode(ctx context.Context, id int64, nn *models.NetworkNode) error {
+	query := `update public.network_nodes
+  set created_at=$2, last_modified_at=$3, network_warden_id=$4, holder_id=$5, name=$6, description=$7, domain_name=$8, location=ST_SetSRID(ST_MakePoint($9, $10), 4326),
+  accounts_capacity=$11, alive=$12, last_pinged_at=$13, is_open=$14, url=$15, api_key_hash=$16, version=$17,
+  rate_limit_max_requests=$18, rate_limit_interval=$19, crawl_rate_limit_max_requests=$20, crawl_rate_limit_interval=$21, status=$22, id_gen_node=$23
+  where id=$1;`
+	params := []interface{}{
+		nn.ID, nn.CreatedAt, nn.LastModifiedAt, nn.NetworkWardenID, nn.HolderID, nn.Name, nn.Description, nn.DomainName, nn.Location.Longitude, nn.Location.Latitude,
+		nn.AccountsCapacity, nn.Alive, nn.LastPingedAt, nn.IsOpen, nn.URL, nn.APIKeyHash, nn.Version,
+		nn.RateLimitMaxRequests, nn.RateLimitInterval, nn.CrawlRateLimitMaxRequests, nn.CrawlRateLimitInterval, nn.Status, nn.IDGenNode,
+	}
+	err := r.driver.ExecuteQuery(ctx, query, params...)
+	return err
+}
+
 func (r *Repository) scanNetworkNode(rows scanner) (*models.NetworkNode, error) {
 	var (
 		nn       models.NetworkNode
@@ -435,6 +450,31 @@ func (r *Repository) GetNetworkNodesByDomainName(ctx context.Context, domainName
   from public.network_nodes
   where domain_name=$1;`
 	row, err := r.driver.QueryRow(ctx, q, domainName)
+	if err != nil {
+		return nil, err
+	}
+
+	nn, err := r.scanNetworkNode(row)
+	if err == nil {
+		return nn, nil
+	}
+
+	if primitives.IsSameError(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+
+	return nil, err
+}
+
+func (r *Repository) GetNetworkNodesByID(ctx context.Context, id int64) (*models.NetworkNode, error) {
+	q := `
+  select
+    id, created_at, last_modified_at, network_warden_id, holder_id, name, description, domain_name, ST_X(location::geometry), ST_Y(location::geometry),
+    accounts_capacity, alive, last_pinged_at, is_open, url, api_key_hash, version,
+    rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node
+  from public.network_nodes
+  where id=$1;`
+	row, err := r.driver.QueryRow(ctx, q, id)
 	if err != nil {
 		return nil, err
 	}
