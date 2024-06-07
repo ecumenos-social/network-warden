@@ -15,10 +15,7 @@ import (
 	"github.com/ecumenos-social/network-warden/services/jwt"
 	networknodes "github.com/ecumenos-social/network-warden/services/network-nodes"
 	smssender "github.com/ecumenos-social/network-warden/services/sms-sender"
-	"github.com/ecumenos-social/schemas/formats"
-	v1 "github.com/ecumenos-social/schemas/proto/gen/common/v1"
 	pbv1 "github.com/ecumenos-social/schemas/proto/gen/networkwarden/v1"
-	"github.com/ecumenos-social/toolkit/types"
 	"github.com/ecumenos-social/toolkit/validators"
 	"github.com/ecumenos-social/toolkitfx"
 	"go.uber.org/fx"
@@ -26,7 +23,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 type Handler struct {
@@ -147,8 +143,8 @@ func (h *Handler) RegisterHolder(ctx context.Context, req *pbv1.RegisterHolderRe
 		Languages:    req.Languages,
 		Password:     req.Password,
 	}
-	if req.AvatarImageUrl != "" {
-		params.AvatarImageURL = &req.AvatarImageUrl
+	if req.AvatarImageUrl != nil {
+		params.AvatarImageURL = req.AvatarImageUrl
 	}
 	holder, err := h.hs.Insert(ctx, logger, params)
 	if err != nil {
@@ -251,7 +247,7 @@ func (h *Handler) sendConfirmationMessage(ctx context.Context, logger *zap.Logge
 	return errorwrapper.New("unknown approach for sending confirmation of registration code")
 }
 
-func (h *Handler) parseToken(ctx context.Context, logger *zap.Logger, token, remoteMacAddress string, scope jwt.TokenScope) (*models.HolderSession, error) {
+func (h *Handler) parseToken(ctx context.Context, logger *zap.Logger, token string, remoteMacAddress *string, scope jwt.TokenScope) (*models.HolderSession, error) {
 	t, err := h.jwt.DecodeToken(logger, token)
 	if err != nil {
 		return nil, status.Errorf(codes.Unauthenticated, "invalid token")
@@ -273,9 +269,12 @@ func (h *Handler) parseToken(ctx context.Context, logger *zap.Logger, token, rem
 		logger.Error("remote IP address doesn't match with session's remote IP address", zap.String("session-remote-ip-address", hs.RemoteIPAddress.String), zap.String("incoming-remote-ip-address", grpcutils.ExtractRemoteIPAddress(ctx)))
 		return nil, status.Error(codes.PermissionDenied, "no permissions")
 	}
-	if hs.RemoteMACAddress.Valid && hs.RemoteMACAddress.String != remoteMacAddress {
-		logger.Error("remote MAC address doesn't match with session's remote MAC address", zap.String("session-remote-mac-address", hs.RemoteMACAddress.String), zap.String("incoming-remote-mac-address", remoteMacAddress))
-		return nil, status.Error(codes.PermissionDenied, "no permissions")
+	if remoteMacAddress != nil {
+		logger = logger.With(zap.String("incoming-remote-mac-address", *remoteMacAddress))
+		if hs.RemoteMACAddress.Valid && hs.RemoteMACAddress.String != *remoteMacAddress {
+			logger.Error("remote MAC address doesn't match with session's remote MAC address", zap.String("session-remote-mac-address", hs.RemoteMACAddress.String))
+			return nil, status.Error(codes.PermissionDenied, "no permissions")
+		}
 	}
 
 	return hs, nil
@@ -285,7 +284,7 @@ func (h *Handler) ConfirmHolderRegistration(ctx context.Context, req *pbv1.Confi
 	logger := h.customizeLogger(ctx, "ConfirmHolderRegistration")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
+	hs, err := h.parseToken(ctx, logger, req.Token, &req.RemoteMacAddress, jwt.TokenScopeAccess)
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +302,7 @@ func (h *Handler) ResendConfirmationCode(ctx context.Context, req *pbv1.ResendCo
 	logger := h.customizeLogger(ctx, "ResendConfirmationCode")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
+	hs, err := h.parseToken(ctx, logger, req.Token, &req.RemoteMacAddress, jwt.TokenScopeAccess)
 	if err != nil {
 		return nil, err
 	}
@@ -366,7 +365,7 @@ func (h *Handler) LogoutHolder(ctx context.Context, req *pbv1.LogoutHolderReques
 	logger := h.customizeLogger(ctx, "LogoutHolder")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
+	hs, err := h.parseToken(ctx, logger, req.Token, &req.RemoteMacAddress, jwt.TokenScopeAccess)
 	if err != nil {
 		return nil, err
 	}
@@ -383,7 +382,7 @@ func (h *Handler) RefreshHolderToken(ctx context.Context, req *pbv1.RefreshHolde
 	logger := h.customizeLogger(ctx, "RefreshHolderToken")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, logger, req.RefreshToken, req.RemoteMacAddress, jwt.TokenScopeRefresh)
+	hs, err := h.parseToken(ctx, logger, req.RefreshToken, &req.RemoteMacAddress, jwt.TokenScopeRefresh)
 	if err != nil {
 		return nil, err
 	}
@@ -414,7 +413,7 @@ func (h *Handler) ChangeHolderPassword(ctx context.Context, req *pbv1.ChangeHold
 	logger := h.customizeLogger(ctx, "ChangeHolderPassword")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
+	hs, err := h.parseToken(ctx, logger, req.Token, &req.RemoteMacAddress, jwt.TokenScopeAccess)
 	if err != nil {
 		return nil, err
 	}
@@ -442,7 +441,7 @@ func (h *Handler) ModifyHolder(ctx context.Context, req *pbv1.ModifyHolderReques
 	logger := h.customizeLogger(ctx, "ModifyHolder")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
+	hs, err := h.parseToken(ctx, logger, req.Token, &req.RemoteMacAddress, jwt.TokenScopeAccess)
 	if err != nil {
 		return nil, err
 	}
@@ -473,7 +472,7 @@ func (h *Handler) GetHolder(ctx context.Context, req *pbv1.GetHolderRequest) (*p
 	logger := h.customizeLogger(ctx, "GetHolder")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
+	hs, err := h.parseToken(ctx, logger, req.Token, &req.RemoteMacAddress, jwt.TokenScopeAccess)
 	if err != nil {
 		return nil, err
 	}
@@ -496,27 +495,11 @@ func (h *Handler) GetHolder(ctx context.Context, req *pbv1.GetHolderRequest) (*p
 	return &pbv1.GetHolderResponse{Data: convertHolderToProtoHolder(holder)}, nil
 }
 
-func convertHolderToProtoHolder(holder *models.Holder) *pbv1.Holder {
-	var avatarImageURL string
-	if holder.AvatarImageURL.Valid {
-		avatarImageURL = holder.AvatarImageURL.String
-	}
-
-	return &pbv1.Holder{
-		Id:             fmt.Sprint(holder.ID),
-		Emails:         holder.Emails,
-		PhoneNumbers:   holder.PhoneNumbers,
-		AvatarImageUrl: avatarImageURL,
-		Countries:      holder.Countries,
-		Languages:      holder.Languages,
-	}
-}
-
 func (h *Handler) DeleteHolder(ctx context.Context, req *pbv1.DeleteHolderRequest) (*pbv1.DeleteHolderResponse, error) {
 	logger := h.customizeLogger(ctx, "DeleteHolder")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
+	hs, err := h.parseToken(ctx, logger, req.Token, &req.RemoteMacAddress, jwt.TokenScopeAccess)
 	if err != nil {
 		return nil, err
 	}
@@ -555,8 +538,8 @@ func (h *Handler) JoinPersonalDataNodeRegistrationWaitlist(ctx context.Context, 
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) RegisterPersonalDataNode(ctx context.Context, _ *pbv1.RegisterPersonalDataNodeRequest) (*pbv1.RegisterPersonalDataNodeResponse, error) {
-	logger := h.customizeLogger(ctx, "RegisterPersonalDataNode")
+func (h *Handler) ActivatePersonalDataNode(ctx context.Context, _ *pbv1.ActivatePersonalDataNodeRequest) (*pbv1.ActivatePersonalDataNodeResponse, error) {
+	logger := h.customizeLogger(ctx, "ActivatePersonalDataNode")
 	defer logger.Info("request processed")
 
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
@@ -566,12 +549,12 @@ func (h *Handler) GetNetworkNodesList(ctx context.Context, req *pbv1.GetNetworkN
 	logger := h.customizeLogger(ctx, "GetNetworkNodesList")
 	defer logger.Info("request processed")
 
-	if req.Token == "" && req.OnlyMy {
+	if req.Token == nil && req.OnlyMy != nil && *req.OnlyMy {
 		return nil, status.Error(codes.InvalidArgument, "token is required if only_my filter is used")
 	}
 	var holderID int64
-	if req.Token != "" {
-		hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
+	if req.Token != nil {
+		hs, err := h.parseToken(ctx, logger, *req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
 		if err != nil {
 			return nil, err
 		}
@@ -579,14 +562,13 @@ func (h *Handler) GetNetworkNodesList(ctx context.Context, req *pbv1.GetNetworkN
 		holderID = hs.HolderID
 	}
 
-	pagination := types.NewPagination(nil, nil)
-	if req.Limit > 0 {
-		pagination.SetLimit(req.Limit)
-	}
-	if req.Offset >= 0 {
-		pagination.SetOffset(req.Offset)
-	}
-	nns, err := h.networkNodesService.GetList(ctx, logger, holderID, pagination, req.OnlyMy)
+	nns, err := h.networkNodesService.GetList(
+		ctx,
+		logger,
+		holderID,
+		convertProtoPaginationToPagination(req.Pagination),
+		req.OnlyMy != nil && *req.OnlyMy,
+	)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get network nodes list")
 	}
@@ -600,73 +582,11 @@ func (h *Handler) GetNetworkNodesList(ctx context.Context, req *pbv1.GetNetworkN
 	}, nil
 }
 
-func convertNetworkNodeToProtoNetworkNode(nn *models.NetworkNode) *pbv1.NetworkNode {
-	var lastPingedAt string
-	if nn.LastPingedAt.Valid {
-		lastPingedAt = formats.FormatDateTime(nn.LastPingedAt.Time)
-	}
-	var status pbv1.NetworkNode_Status
-	switch nn.Status {
-	case models.NetworkNodeStatusApproved:
-		status = pbv1.NetworkNode_STATUS_APPROVED
-	case models.NetworkNodeStatusPending:
-		status = pbv1.NetworkNode_STATUS_PENDING
-	case models.NetworkNodeStatusRejected:
-		status = pbv1.NetworkNode_STATUS_REJECTED
-	}
-
-	return &pbv1.NetworkNode{
-		Id:               fmt.Sprint(nn.ID),
-		CreatedAt:        formats.FormatDateTime(nn.CreatedAt),
-		LastModifiedAt:   formats.FormatDateTime(nn.LastModifiedAt),
-		NwId:             fmt.Sprint(nn.NetworkWardenID),
-		Name:             nn.Name,
-		DomainName:       nn.DomainName,
-		Location:         convertLocationToProtoLocation(nn.Location),
-		AccountsCapacity: nn.AccountsCapacity,
-		Alive:            nn.Alive,
-		LastPingedAt:     lastPingedAt,
-		IsOpen:           nn.IsOpen,
-		OwnerHolderId:    fmt.Sprint(nn.HolderID),
-		Url:              nn.URL,
-		Version:          nn.Version,
-		RateLimit: convertRateLimitToProtoRateLimit(&types.RateLimit{
-			MaxRequests: nn.RateLimitMaxRequests,
-			Interval:    nn.RateLimitInterval,
-		}),
-		CrawlRateLimit: convertRateLimitToProtoRateLimit(&types.RateLimit{
-			MaxRequests: nn.CrawlRateLimitMaxRequests,
-			Interval:    nn.CrawlRateLimitInterval,
-		}),
-		Status: status,
-	}
-}
-
-func convertLocationToProtoLocation(l *models.Location) *v1.Geolocation {
-	if l == nil {
-		return nil
-	}
-	return &v1.Geolocation{
-		Latitude:  l.Latitude,
-		Longitude: l.Longitude,
-	}
-}
-
-func convertRateLimitToProtoRateLimit(rl *types.RateLimit) *v1.RateLimit {
-	if rl == nil {
-		return nil
-	}
-	return &v1.RateLimit{
-		MaxRequests: rl.MaxRequests,
-		Interval:    durationpb.New(rl.Interval),
-	}
-}
-
 func (h *Handler) JoinNetworkNodeRegistrationWaitlist(ctx context.Context, req *pbv1.JoinNetworkNodeRegistrationWaitlistRequest) (*pbv1.JoinNetworkNodeRegistrationWaitlistResponse, error) {
 	logger := h.customizeLogger(ctx, "JoinNetworkNodeRegistrationWaitlist")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
+	hs, err := h.parseToken(ctx, logger, req.Token, &req.RemoteMacAddress, jwt.TokenScopeAccess)
 	if err != nil {
 		return nil, err
 	}
@@ -694,11 +614,11 @@ func (h *Handler) JoinNetworkNodeRegistrationWaitlist(ctx context.Context, req *
 	}, nil
 }
 
-func (h *Handler) RegisterNetworkNode(ctx context.Context, req *pbv1.RegisterNetworkNodeRequest) (*pbv1.RegisterNetworkNodeResponse, error) {
-	logger := h.customizeLogger(ctx, "RegisterNetworkNode")
+func (h *Handler) ActivateNetworkNode(ctx context.Context, req *pbv1.ActivateNetworkNodeRequest) (*pbv1.ActivateNetworkNodeResponse, error) {
+	logger := h.customizeLogger(ctx, "ActivateNetworkNode")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
+	hs, err := h.parseToken(ctx, logger, req.Token, &req.RemoteMacAddress, jwt.TokenScopeAccess)
 	if err != nil {
 		return nil, err
 	}
@@ -709,13 +629,13 @@ func (h *Handler) RegisterNetworkNode(ctx context.Context, req *pbv1.RegisterNet
 		return nil, status.Error(codes.InvalidArgument, "invalid network node ID")
 	}
 
-	_, apiKey, err := h.networkNodesService.Confirm(ctx, logger, hs.HolderID, id, req.Code)
+	_, apiKey, err := h.networkNodesService.Confirm(ctx, logger, hs.HolderID, id)
 	if err != nil {
 		logger.Error("failed to confirm", zap.Error(err), zap.String("incoming-network-node-id", req.Id))
 		return nil, status.Error(codes.Internal, "failed to confirm")
 	}
 
-	return &pbv1.RegisterNetworkNodeResponse{
+	return &pbv1.ActivateNetworkNodeResponse{
 		Success: true,
 		ApiKey:  apiKey,
 	}, nil

@@ -6,7 +6,7 @@ require (
 	github.com/ecumenos-social/error-wrapper v0.0.1
 	github.com/ecumenos-social/grpc-utils v0.0.1
 	github.com/ecumenos-social/id-generator v0.0.3
-	github.com/ecumenos-social/schemas v0.0.15
+	github.com/ecumenos-social/schemas v0.0.16
 	github.com/ecumenos-social/toolkit v0.0.4
 	github.com/ecumenos-social/toolkitfx v0.0.8
 	github.com/golang-migrate/migrate/v4 v4.17.1
@@ -15,6 +15,7 @@ require (
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/joho/godotenv v1.5.1
 	github.com/lestrrat-go/jwx/v2 v2.0.21
+	github.com/samber/lo v1.39.0
 	github.com/urfave/cli/v2 v2.27.2
 	go.uber.org/fx v1.21.1
 	go.uber.org/zap v1.27.0
@@ -59,6 +60,7 @@ require (
 	go.uber.org/dig v1.17.1 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/crypto v0.23.0 // indirect
+	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
 	golang.org/x/net v0.25.0 // indirect
 	golang.org/x/sys v0.20.0 // indirect
 	golang.org/x/text v0.15.0 // indirect
