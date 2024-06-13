@@ -19,7 +19,8 @@ import (
 type Repository interface {
 	InsertNetworkNode(ctx context.Context, nn *models.NetworkNode) error
 	GetNetworkNodesByDomainName(ctx context.Context, domainName string) (*models.NetworkNode, error)
-	GetNetworkNodesByID(ctx context.Context, id int64) (*models.NetworkNode, error)
+	GetNetworkNodeByID(ctx context.Context, id int64) (*models.NetworkNode, error)
+	GetNetworkNodeByAPIKeyHash(ctx context.Context, apiKeyHash string) (*models.NetworkNode, error)
 	ModifyNetworkNode(ctx context.Context, id int64, nn *models.NetworkNode) error
 	GetNetworkNodesList(ctx context.Context, filters map[string]interface{}, pagination *types.Pagination) ([]*models.NetworkNode, error)
 }
@@ -28,6 +29,7 @@ type Service interface {
 	Insert(ctx context.Context, logger *zap.Logger, params *InsertParams) (*models.NetworkNode, error)
 	Confirm(ctx context.Context, logger *zap.Logger, holderID, id int64) (nn *models.NetworkNode, apiKey string, err error)
 	GetList(ctx context.Context, logger *zap.Logger, holderID int64, pagination *types.Pagination, onlyMy bool) ([]*models.NetworkNode, error)
+	Initiate(ctx context.Context, logger *zap.Logger, apiKey string, params *InitiateParams) error
 }
 
 type service struct {
@@ -109,7 +111,7 @@ func (s *service) Insert(ctx context.Context, logger *zap.Logger, params *Insert
 }
 
 func (s *service) Confirm(ctx context.Context, logger *zap.Logger, holderID, id int64) (*models.NetworkNode, string, error) {
-	nn, err := s.repo.GetNetworkNodesByID(ctx, id)
+	nn, err := s.repo.GetNetworkNodeByID(ctx, id)
 	if err != nil {
 		logger.Error("failed to get network node by id", zap.Error(err))
 		return nil, "", err
@@ -136,6 +138,47 @@ func (s *service) Confirm(ctx context.Context, logger *zap.Logger, holderID, id 
 	}
 
 	return nn, apiKey, nil
+}
+
+type InitiateParams struct {
+	AccountsCapacity int64
+	IsOpen           bool
+	Version          string
+	RateLimit        *types.RateLimit
+	CrawlRateLimit   *types.RateLimit
+	IDGenNode        int64
+}
+
+func (s *service) Initiate(ctx context.Context, logger *zap.Logger, apiKey string, params *InitiateParams) error {
+	apiKeyHash := hash.SHA1(apiKey)
+	nn, err := s.repo.GetNetworkNodeByAPIKeyHash(ctx, apiKeyHash)
+	if err != nil {
+		logger.Error("failed to get network node by api key", zap.Error(err), zap.String("api-key", apiKey))
+		return err
+	}
+	if nn == nil {
+		logger.Error("network node is not found")
+		return errorwrapper.New("network node is not found")
+	}
+	if nn.Status != models.NetworkNodeStatusApproved {
+		logger.Error("network node is not approved", zap.Int64("network-node-id", nn.ID), zap.String("network-node-status", string(nn.Status)))
+		return errorwrapper.New("network node must be approved")
+	}
+
+	nn.AccountsCapacity = params.AccountsCapacity
+	nn.IsOpen = params.IsOpen
+	nn.Version = params.Version
+	nn.RateLimitInterval = params.RateLimit.Interval
+	nn.RateLimitMaxRequests = params.RateLimit.MaxRequests
+	nn.CrawlRateLimitInterval = params.CrawlRateLimit.Interval
+	nn.CrawlRateLimitMaxRequests = params.CrawlRateLimit.MaxRequests
+	nn.IDGenNode = params.IDGenNode
+	if err := s.repo.ModifyNetworkNode(ctx, nn.ID, nn); err != nil {
+		logger.Error("failed to modify network node", zap.Error(err), zap.Int64("network-node-id", nn.ID))
+		return errorwrapper.New("failed to modify network node")
+	}
+
+	return nil
 }
 
 func (s *service) GetList(ctx context.Context, logger *zap.Logger, holderID int64, pagination *types.Pagination, onlyMy bool) ([]*models.NetworkNode, error) {

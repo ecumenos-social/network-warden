@@ -16,6 +16,7 @@ import (
 	networknodes "github.com/ecumenos-social/network-warden/services/network-nodes"
 	smssender "github.com/ecumenos-social/network-warden/services/sms-sender"
 	pbv1 "github.com/ecumenos-social/schemas/proto/gen/networkwarden/v1"
+	"github.com/ecumenos-social/toolkit/types"
 	"github.com/ecumenos-social/toolkit/validators"
 	"github.com/ecumenos-social/toolkitfx"
 	"go.uber.org/fx"
@@ -524,6 +525,20 @@ func (h *Handler) DeleteHolder(ctx context.Context, req *pbv1.DeleteHolderReques
 	return &pbv1.DeleteHolderResponse{Success: true}, nil
 }
 
+func (h *Handler) isHolderConfirmed(ctx context.Context, logger *zap.Logger, holderID int64) (bool, error) {
+	holder, err := h.hs.GetHolderByID(ctx, logger, holderID)
+	if err != nil {
+		logger.Error("failed to get holder by ID", zap.Error(err))
+		return false, err
+	}
+	if holder == nil {
+		logger.Error("holder is not found by ID")
+		return false, errorwrapper.New("holder is not found")
+	}
+
+	return holder.Confirmed, nil
+}
+
 func (h *Handler) GetPersonalDataNodesList(ctx context.Context, _ *pbv1.GetPersonalDataNodesListRequest) (*pbv1.GetPersonalDataNodesListResponse, error) {
 	logger := h.customizeLogger(ctx, "GetPersonalDataNodesList")
 	defer logger.Info("request processed")
@@ -591,6 +606,12 @@ func (h *Handler) JoinNetworkNodeRegistrationWaitlist(ctx context.Context, req *
 		return nil, err
 	}
 	logger = logger.With(zap.Int64("holder-id", hs.HolderID))
+	if isConfirmed, err := h.isHolderConfirmed(ctx, logger, hs.HolderID); !isConfirmed || err != nil {
+		if !isConfirmed {
+			return nil, status.Error(codes.PermissionDenied, "holder is not confirmed")
+		}
+		return nil, status.Errorf(codes.Internal, "failed to validate holder if holder is confirmed, err = %v", err.Error())
+	}
 
 	nn, err := h.networkNodesService.Insert(ctx, logger, &networknodes.InsertParams{
 		HolderID:        hs.HolderID,
@@ -641,7 +662,33 @@ func (h *Handler) ActivateNetworkNode(ctx context.Context, req *pbv1.ActivateNet
 	}, nil
 }
 
-func (h *Handler) GetNetworkWardensList(ctx context.Context, _ *pbv1.GetNetworkWardensListRequest) (*pbv1.GetNetworkWardensListResponse, error) {
+func (h *Handler) InitiateNetworkNode(ctx context.Context, req *pbv1.InitiateNetworkNodeRequest) (*pbv1.InitiateNetworkNodeResponse, error) {
+	logger := h.customizeLogger(ctx, "InitiateNetworkNode")
+	defer logger.Info("request processed")
+
+	params := &networknodes.InitiateParams{
+		AccountsCapacity: req.AccountsCapacity,
+		IsOpen:           req.IsOpen,
+		Version:          req.Version,
+		RateLimit: &types.RateLimit{
+			MaxRequests: req.RateLimit.MaxRequests,
+			Interval:    req.RateLimit.Interval.AsDuration(),
+		},
+		CrawlRateLimit: &types.RateLimit{
+			MaxRequests: req.CrawlRateLimit.MaxRequests,
+			Interval:    req.CrawlRateLimit.Interval.AsDuration(),
+		},
+		IDGenNode: req.IdGenNode,
+	}
+	if err := h.networkNodesService.Initiate(ctx, logger, req.ApiKey, params); err != nil {
+		logger.Error("failed to initiate", zap.Error(err), zap.String("incoming-network-node-api-key", req.ApiKey))
+		return nil, status.Error(codes.Internal, "failed to confirm")
+	}
+
+	return &pbv1.InitiateNetworkNodeResponse{Success: true}, nil
+}
+
+func (h *Handler) GetNetworkWardensList(ctx context.Context, req *pbv1.GetNetworkWardensListRequest) (*pbv1.GetNetworkWardensListResponse, error) {
 	logger := h.customizeLogger(ctx, "GetNetworkWardensList")
 	defer logger.Info("request processed")
 
