@@ -14,6 +14,7 @@ import (
 	"github.com/ecumenos-social/network-warden/services/holders"
 	"github.com/ecumenos-social/network-warden/services/jwt"
 	networknodes "github.com/ecumenos-social/network-warden/services/network-nodes"
+	personaldatanodes "github.com/ecumenos-social/network-warden/services/personal-data-nodes"
 	smssender "github.com/ecumenos-social/network-warden/services/sms-sender"
 	pbv1 "github.com/ecumenos-social/schemas/proto/gen/networkwarden/v1"
 	"github.com/ecumenos-social/toolkit/types"
@@ -29,13 +30,14 @@ import (
 type Handler struct {
 	pbv1.NetworkWardenServiceServer
 
-	jwt                 jwt.Service
-	hs                  holders.Service
-	auth                auth.Service
-	emailer             emailer.Service
-	smsSender           smssender.Service
-	networkNodesService networknodes.Service
-	logger              *zap.Logger
+	jwt                      jwt.Service
+	hs                       holders.Service
+	auth                     auth.Service
+	emailer                  emailer.Service
+	smsSender                smssender.Service
+	networkNodesService      networknodes.Service
+	personalDataNodesService personaldatanodes.Service
+	logger                   *zap.Logger
 
 	networkWardenID int64
 }
@@ -45,25 +47,27 @@ var _ pbv1.NetworkWardenServiceServer = (*Handler)(nil)
 type handlerParams struct {
 	fx.In
 
-	Config                *toolkitfx.AppConfig
-	HoldersService        holders.Service
-	HolderSessionsService auth.Service
-	AuthService           jwt.Service
-	EmailerService        emailer.Service
-	SMSSenderService      smssender.Service
-	NetworkNodesService   networknodes.Service
-	Logger                *zap.Logger
+	Config                   *toolkitfx.NetworkWardenAppConfig
+	HoldersService           holders.Service
+	HolderSessionsService    auth.Service
+	AuthService              jwt.Service
+	EmailerService           emailer.Service
+	SMSSenderService         smssender.Service
+	NetworkNodesService      networknodes.Service
+	PersonalDataNodesService personaldatanodes.Service
+	Logger                   *zap.Logger
 }
 
 func NewHandler(params handlerParams) *Handler {
 	return &Handler{
-		hs:                  params.HoldersService,
-		auth:                params.HolderSessionsService,
-		jwt:                 params.AuthService,
-		emailer:             params.EmailerService,
-		smsSender:           params.SMSSenderService,
-		networkNodesService: params.NetworkNodesService,
-		logger:              params.Logger,
+		hs:                       params.HoldersService,
+		auth:                     params.HolderSessionsService,
+		jwt:                      params.AuthService,
+		emailer:                  params.EmailerService,
+		smsSender:                params.SMSSenderService,
+		networkNodesService:      params.NetworkNodesService,
+		personalDataNodesService: params.PersonalDataNodesService,
+		logger:                   params.Logger,
 
 		networkWardenID: params.Config.ID,
 	}
@@ -546,15 +550,53 @@ func (h *Handler) GetPersonalDataNodesList(ctx context.Context, _ *pbv1.GetPerso
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) JoinPersonalDataNodeRegistrationWaitlist(ctx context.Context, _ *pbv1.JoinPersonalDataNodeRegistrationWaitlistRequest) (*pbv1.JoinPersonalDataNodeRegistrationWaitlistResponse, error) {
+func (h *Handler) JoinPersonalDataNodeRegistrationWaitlist(ctx context.Context, req *pbv1.JoinPersonalDataNodeRegistrationWaitlistRequest) (*pbv1.JoinPersonalDataNodeRegistrationWaitlistResponse, error) {
 	logger := h.customizeLogger(ctx, "JoinPersonalDataNodeRegistrationWaitlist")
+	defer logger.Info("request processed")
+
+	hs, err := h.parseToken(ctx, logger, req.Token, &req.RemoteMacAddress, jwt.TokenScopeAccess)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("holder-id", hs.HolderID))
+	if isConfirmed, err := h.isHolderConfirmed(ctx, logger, hs.HolderID); !isConfirmed || err != nil {
+		if !isConfirmed {
+			return nil, status.Error(codes.PermissionDenied, "holder is not confirmed")
+		}
+		return nil, status.Errorf(codes.Internal, "failed to validate holder if holder is confirmed, err = %v", err.Error())
+	}
+
+	pdn, err := h.personalDataNodesService.Insert(ctx, logger, &personaldatanodes.InsertParams{
+		HolderID:        hs.HolderID,
+		NetworkWardenID: h.networkWardenID,
+		Name:            req.Name,
+		Description:     req.Description,
+		Label:           req.Label,
+		Location: &models.Location{
+			Longitude: req.Location.Longitude,
+			Latitude:  req.Location.Latitude,
+		},
+		URL: req.Url,
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to insert personal data node, err = %v", err.Error())
+	}
+
+	return &pbv1.JoinPersonalDataNodeRegistrationWaitlistResponse{
+		Success: true,
+		Id:      fmt.Sprint(pdn.ID),
+	}, nil
+}
+
+func (h *Handler) ActivatePersonalDataNode(ctx context.Context, _ *pbv1.ActivatePersonalDataNodeRequest) (*pbv1.ActivatePersonalDataNodeResponse, error) {
+	logger := h.customizeLogger(ctx, "ActivatePersonalDataNode")
 	defer logger.Info("request processed")
 
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) ActivatePersonalDataNode(ctx context.Context, _ *pbv1.ActivatePersonalDataNodeRequest) (*pbv1.ActivatePersonalDataNodeResponse, error) {
-	logger := h.customizeLogger(ctx, "ActivatePersonalDataNode")
+func (h *Handler) InitiatePersonalDataNode(ctx context.Context, _ *pbv1.InitiatePersonalDataNodeRequest) (*pbv1.InitiatePersonalDataNodeResponse, error) {
+	logger := h.customizeLogger(ctx, "InitiatePersonalDataNode")
 	defer logger.Info("request processed")
 
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")

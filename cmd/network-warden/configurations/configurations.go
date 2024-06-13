@@ -18,30 +18,32 @@ import (
 type fxConfig struct {
 	fx.Out
 
-	App                       *toolkitfx.AppConfig
-	Logger                    *fxlogger.Config
-	GRPC                      *fxgrpc.Config
-	Postgres                  *fxpostgres.Config
-	HolderSessionsIDGenerator *idgenerators.HolderSessionsIDGeneratorConfig
-	HoldersIDGenerator        *idgenerators.HoldersIDGeneratorConfig
-	SentEmailsIDGenerator     *idgenerators.SentEmailsIDGeneratorConfig
-	NetworkNodesIDGenerator   *idgenerators.NetworkNodesIDGeneratorConfig
-	JWT                       *jwt.Config
-	Auth                      *auth.Config
-	Emailer                   *emailer.Config
-	SMSSender                 *smssender.Config
+	App                          *toolkitfx.NetworkWardenAppConfig
+	Logger                       *fxlogger.Config
+	GRPC                         *fxgrpc.Config
+	Postgres                     *fxpostgres.Config
+	HolderSessionsIDGenerator    *idgenerators.HolderSessionsIDGeneratorConfig
+	HoldersIDGenerator           *idgenerators.HoldersIDGeneratorConfig
+	SentEmailsIDGenerator        *idgenerators.SentEmailsIDGeneratorConfig
+	NetworkNodesIDGenerator      *idgenerators.NetworkNodesIDGeneratorConfig
+	PersonalDataNodesIDGenerator *idgenerators.PersonalDataNodesIDGeneratorConfig
+	JWT                          *jwt.Config
+	Auth                         *auth.Config
+	Emailer                      *emailer.Config
+	SMSSender                    *smssender.Config
 }
 
 var Module = func(cctx *cli.Context) fx.Option {
 	return fx.Options(
 		fx.Provide(func() fxConfig {
 			return fxConfig{
-				App: &toolkitfx.AppConfig{
-					ID:          cctx.Int64("nw-app-id"),
-					IDGenNode:   cctx.Int64("nw-app-id-gen-node"),
-					Name:        cctx.String("nw-app-name"),
-					Description: cctx.String("nw-app-description"),
-					RateLimit:   &types.RateLimit{MaxRequests: cctx.Int64("nw-app-rate-limit-max-requests"), Interval: cctx.Duration("nw-app-rate-limit-interval")},
+				App: &toolkitfx.NetworkWardenAppConfig{
+					ID:            cctx.Int64("nw-app-id"),
+					IDGenNode:     cctx.Int64("nw-app-id-gen-node"),
+					Name:          cctx.String("nw-app-name"),
+					Description:   cctx.String("nw-app-description"),
+					AddressSuffix: cctx.String("nw-app-address-suffix"),
+					RateLimit:     &types.RateLimit{MaxRequests: cctx.Int64("nw-app-rate-limit-max-requests"), Interval: cctx.Duration("nw-app-rate-limit-interval")},
 				},
 				Logger: &fxlogger.Config{
 					Production: cctx.Bool("nw-logger-production"),
@@ -85,6 +87,10 @@ var Module = func(cctx *cli.Context) fx.Option {
 					LowNodeID: 0,
 				},
 				NetworkNodesIDGenerator: &idgenerators.NetworkNodesIDGeneratorConfig{
+					TopNodeID: cctx.Int64("nw-app-id-gen-node"),
+					LowNodeID: 0,
+				},
+				PersonalDataNodesIDGenerator: &idgenerators.PersonalDataNodesIDGeneratorConfig{
 					TopNodeID: cctx.Int64("nw-app-id-gen-node"),
 					LowNodeID: 0,
 				},
