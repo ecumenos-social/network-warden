@@ -455,7 +455,7 @@ func (r *Repository) GetNetworkNodesList(ctx context.Context, filters map[string
 	return out, nil
 }
 
-func (r *Repository) GetNetworkNodesByDomainName(ctx context.Context, domainName string) (*models.NetworkNode, error) {
+func (r *Repository) GetNetworkNodeByDomainName(ctx context.Context, domainName string) (*models.NetworkNode, error) {
 	q := `
   select
     id, created_at, last_modified_at, network_warden_id, holder_id, name, description, domain_name, ST_X(location::geometry), ST_Y(location::geometry),
@@ -521,6 +521,192 @@ func (r *Repository) GetNetworkNodeByAPIKeyHash(ctx context.Context, apiKeyHash 
 	nn, err := r.scanNetworkNode(row)
 	if err == nil {
 		return nn, nil
+	}
+
+	if primitives.IsSameError(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+
+	return nil, err
+}
+
+func (r *Repository) InsertPersonalDataNode(ctx context.Context, pdn *models.PersonalDataNode) error {
+	query := `insert into public.personal_data_nodes
+  (id, created_at, last_modified_at, network_warden_id, holder_id, label, address, name, description, location,
+   accounts_capacity, alive, last_pinged_at, is_open, url, api_key_hash, version,
+   rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node)
+  values ($1, $2, $3, $4, $5, $6, $7, $8, $9, ST_SetSRID(ST_MakePoint($10, $11), 4326), $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24);`
+	params := []interface{}{
+		pdn.ID, pdn.CreatedAt, pdn.LastModifiedAt, pdn.NetworkWardenID, pdn.HolderID, pdn.Label, pdn.Address, pdn.Name, pdn.Description, pdn.Location.Longitude, pdn.Location.Latitude,
+		pdn.AccountsCapacity, pdn.Alive, pdn.LastPingedAt, pdn.IsOpen, pdn.URL, pdn.APIKeyHash, pdn.Version,
+		pdn.RateLimitMaxRequests, pdn.RateLimitInterval, pdn.CrawlRateLimitMaxRequests, pdn.CrawlRateLimitInterval, pdn.Status, pdn.IDGenNode,
+	}
+	err := r.driver.ExecuteQuery(ctx, query, params...)
+	return err
+}
+
+func (r *Repository) ModifyPersonalDataNode(ctx context.Context, id int64, pdn *models.PersonalDataNode) error {
+	query := `update public.personal_data_nodes
+  set created_at=$2, last_modified_at=$3, network_warden_id=$4, holder_id=$5, label=$6, address=$7, name=$8, description=$9, location=ST_SetSRID(ST_MakePoint($10, $11), 4326),
+  accounts_capacity=$12, alive=$13, last_pinged_at=$14, is_open=$15, url=$16, api_key_hash=$17, version=$18,
+  rate_limit_max_requests=$19, rate_limit_interval=$20, crawl_rate_limit_max_requests=$21, crawl_rate_limit_interval=$22, status=$23, id_gen_node=$24
+  where id=$1;`
+	params := []interface{}{
+		pdn.ID, pdn.CreatedAt, pdn.LastModifiedAt, pdn.NetworkWardenID, pdn.HolderID, pdn.Label, pdn.Address, pdn.Name, pdn.Description, pdn.Location.Longitude, pdn.Location.Latitude,
+		pdn.AccountsCapacity, pdn.Alive, pdn.LastPingedAt, pdn.IsOpen, pdn.URL, pdn.APIKeyHash, pdn.Version,
+		pdn.RateLimitMaxRequests, pdn.RateLimitInterval, pdn.CrawlRateLimitMaxRequests, pdn.CrawlRateLimitInterval, pdn.Status, pdn.IDGenNode,
+	}
+	err := r.driver.ExecuteQuery(ctx, query, params...)
+	return err
+}
+
+func (r *Repository) scanPersonalDataNode(rows scanner) (*models.PersonalDataNode, error) {
+	var (
+		pdn      models.PersonalDataNode
+		location models.Location
+	)
+	err := rows.Scan(
+		&pdn.ID,
+		&pdn.CreatedAt,
+		&pdn.LastModifiedAt,
+		&pdn.NetworkWardenID,
+		&pdn.HolderID,
+		&pdn.Label,
+		&pdn.Address,
+		&pdn.Name,
+		&pdn.Description,
+		&location.Longitude,
+		&location.Latitude,
+		&pdn.AccountsCapacity,
+		&pdn.Alive,
+		&pdn.LastPingedAt,
+		&pdn.IsOpen,
+		&pdn.URL,
+		&pdn.APIKeyHash,
+		&pdn.Version,
+		&pdn.RateLimitMaxRequests,
+		&pdn.RateLimitInterval,
+		&pdn.CrawlRateLimitMaxRequests,
+		&pdn.CrawlRateLimitInterval,
+		&pdn.Status,
+		&pdn.IDGenNode,
+	)
+	if err != nil {
+		return nil, err
+	}
+	pdn.Location = &location
+
+	return &pdn, nil
+}
+
+func (r *Repository) GetPersonalDataNodesList(ctx context.Context, filters map[string]interface{}, pagination *types.Pagination) ([]*models.PersonalDataNode, error) {
+	var (
+		whereStatements = make([]string, 0, len(filters))
+		args            = make([]interface{}, 0, len(filters)+2)
+	)
+	args = append(args, pagination.GetLimit(), pagination.GetOffset())
+
+	for field, value := range filters {
+		args = append(args, value)
+		whereStatements = append(whereStatements, field+"=$"+fmt.Sprint(len(args)))
+	}
+	var whereStatement string
+	if len(whereStatements) > 0 {
+		whereStatement = "where " + strings.Join(whereStatements, ", ")
+	}
+
+	q := fmt.Sprintf(`
+  select
+    id, created_at, last_modified_at, network_warden_id, holder_id, label, address, name, description, ST_X(location::geometry), ST_Y(location::geometry),
+    accounts_capacity, alive, last_pinged_at, is_open, url, api_key_hash, version,
+    rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node
+  from public.personal_data_nodes %s limit $1 offset $2;`, whereStatement)
+	rows, err := r.driver.QueryRows(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	var out []*models.PersonalDataNode
+
+	for rows.Next() {
+		pdn, err := r.scanPersonalDataNode(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, pdn)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func (r *Repository) GetPersonalDataNodeByLabel(ctx context.Context, label string) (*models.PersonalDataNode, error) {
+	q := `
+  select
+    id, created_at, last_modified_at, network_warden_id, holder_id, label, address, name, description, ST_X(location::geometry), ST_Y(location::geometry),
+    accounts_capacity, alive, last_pinged_at, is_open, url, api_key_hash, version,
+    rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node
+  from public.personal_data_nodes
+  where label=$1;`
+	row, err := r.driver.QueryRow(ctx, q, label)
+	if err != nil {
+		return nil, err
+	}
+
+	pdn, err := r.scanPersonalDataNode(row)
+	if err == nil {
+		return pdn, nil
+	}
+
+	if primitives.IsSameError(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+
+	return nil, err
+}
+
+func (r *Repository) GetPersonalDataNodeByID(ctx context.Context, id int64) (*models.PersonalDataNode, error) {
+	q := `
+  select
+    id, created_at, last_modified_at, network_warden_id, holder_id, label, address, name, description, ST_X(location::geometry), ST_Y(location::geometry),
+    accounts_capacity, alive, last_pinged_at, is_open, url, api_key_hash, version,
+    rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node
+  from public.personal_data_nodes
+  where id=$1;`
+	row, err := r.driver.QueryRow(ctx, q, id)
+	if err != nil {
+		return nil, err
+	}
+
+	pdn, err := r.scanPersonalDataNode(row)
+	if err == nil {
+		return pdn, nil
+	}
+
+	if primitives.IsSameError(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+
+	return nil, err
+}
+
+func (r *Repository) GetPersonalDataNodeByAPIKeyHash(ctx context.Context, apiKeyHash string) (*models.PersonalDataNode, error) {
+	q := `
+  select
+    id, created_at, last_modified_at, network_warden_id, holder_id, label, address, name, description, ST_X(location::geometry), ST_Y(location::geometry),
+    accounts_capacity, alive, last_pinged_at, is_open, url, api_key_hash, version,
+    rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node
+  from public.personal_data_nodes
+  where api_key_hash=$1;`
+	row, err := r.driver.QueryRow(ctx, q, apiKeyHash)
+	if err != nil {
+		return nil, err
+	}
+
+	pdn, err := r.scanPersonalDataNode(row)
+	if err == nil {
+		return pdn, nil
 	}
 
 	if primitives.IsSameError(err, pgx.ErrNoRows) {

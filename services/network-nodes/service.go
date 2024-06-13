@@ -18,7 +18,7 @@ import (
 
 type Repository interface {
 	InsertNetworkNode(ctx context.Context, nn *models.NetworkNode) error
-	GetNetworkNodesByDomainName(ctx context.Context, domainName string) (*models.NetworkNode, error)
+	GetNetworkNodeByDomainName(ctx context.Context, domainName string) (*models.NetworkNode, error)
 	GetNetworkNodeByID(ctx context.Context, id int64) (*models.NetworkNode, error)
 	GetNetworkNodeByAPIKeyHash(ctx context.Context, apiKeyHash string) (*models.NetworkNode, error)
 	ModifyNetworkNode(ctx context.Context, id int64, nn *models.NetworkNode) error
@@ -58,7 +58,7 @@ type InsertParams struct {
 
 func (s *service) Insert(ctx context.Context, logger *zap.Logger, params *InsertParams) (*models.NetworkNode, error) {
 	logger = logger.With(zap.String("network-node-domain-name", params.DomainName), zap.String("network-node-name", params.Name))
-	if nn, err := s.repo.GetNetworkNodesByDomainName(ctx, params.DomainName); err != nil || nn != nil {
+	if nn, err := s.repo.GetNetworkNodeByDomainName(ctx, params.DomainName); err != nil || nn != nil {
 		if err != nil {
 			logger.Error("failed to get network node by domain name", zap.Error(err))
 			return nil, err
