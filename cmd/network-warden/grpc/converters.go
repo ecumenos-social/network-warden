@@ -30,7 +30,7 @@ func convertHolderToProtoHolder(holder *models.Holder) *pbv1.Holder {
 
 func convertProtoPaginationToPagination(p *v1.Pagination) *types.Pagination {
 	if p == nil {
-		return nil
+		return types.NewPagination(nil, nil)
 	}
 
 	return types.NewPagination(p.Limit, p.Offset)
