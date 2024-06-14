@@ -27,7 +27,7 @@ type Repository interface {
 
 type Service interface {
 	Insert(ctx context.Context, logger *zap.Logger, params *InsertParams) (*models.NetworkNode, error)
-	Confirm(ctx context.Context, logger *zap.Logger, holderID, id int64) (nn *models.NetworkNode, apiKey string, err error)
+	Activate(ctx context.Context, logger *zap.Logger, holderID, id int64) (nn *models.NetworkNode, apiKey string, err error)
 	GetList(ctx context.Context, logger *zap.Logger, holderID int64, pagination *types.Pagination, onlyMy bool) ([]*models.NetworkNode, error)
 	Initiate(ctx context.Context, logger *zap.Logger, apiKey string, params *InitiateParams) error
 }
@@ -110,7 +110,7 @@ func (s *service) Insert(ctx context.Context, logger *zap.Logger, params *Insert
 	return nn, nil
 }
 
-func (s *service) Confirm(ctx context.Context, logger *zap.Logger, holderID, id int64) (*models.NetworkNode, string, error) {
+func (s *service) Activate(ctx context.Context, logger *zap.Logger, holderID, id int64) (*models.NetworkNode, string, error) {
 	nn, err := s.repo.GetNetworkNodeByID(ctx, id)
 	if err != nil {
 		logger.Error("failed to get network node by id", zap.Error(err))
@@ -123,6 +123,10 @@ func (s *service) Confirm(ctx context.Context, logger *zap.Logger, holderID, id 
 	if nn.HolderID != holderID {
 		logger.Error("have no permissions for confirm network node")
 		return nil, "", errorwrapper.New("have no permissions for confirm network node")
+	}
+	if nn.Status != models.NetworkNodeStatusApproved {
+		logger.Error("network node is not approved")
+		return nil, "", errorwrapper.New("network node is not approved")
 	}
 
 	apiKey, err := random.GenAPIKey("nn", fmt.Sprint(s.networkWardenID))

@@ -54,6 +54,9 @@ run-nw-migrate-down: .env
 run-nw-seed: .env
 	go run cmd/network-warden/*.go seed
 
+.PHONY: run-nw-purge-seed
+run-nw-purge-seed: run-nw-migrate-down run-nw-migrate-up run-nw-seed
+
 .PHONY: run-admin
 run-admin: .env
 	go run cmd/admin/*.go run

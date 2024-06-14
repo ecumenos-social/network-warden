@@ -692,7 +692,7 @@ func (h *Handler) ActivateNetworkNode(ctx context.Context, req *pbv1.ActivateNet
 		return nil, status.Error(codes.InvalidArgument, "invalid network node ID")
 	}
 
-	_, apiKey, err := h.networkNodesService.Confirm(ctx, logger, hs.HolderID, id)
+	_, apiKey, err := h.networkNodesService.Activate(ctx, logger, hs.HolderID, id)
 	if err != nil {
 		logger.Error("failed to confirm", zap.Error(err), zap.String("incoming-network-node-id", req.Id))
 		return nil, status.Error(codes.Internal, "failed to confirm")
