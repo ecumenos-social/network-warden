@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/ecumenos-social/network-warden/cmd/network-warden/configurations"
 	"github.com/ecumenos-social/network-warden/cmd/network-warden/grpc"
+	"github.com/ecumenos-social/network-warden/cmd/network-warden/pgseeds"
 	"github.com/ecumenos-social/network-warden/cmd/network-warden/repository"
 	"github.com/ecumenos-social/network-warden/pkg/fxpostgres"
 	"github.com/ecumenos-social/network-warden/services/auth"
@@ -38,6 +39,7 @@ var Dependencies = fx.Options(
 		idgenerators.NewHoldersIDGenerator,
 		idgenerators.NewNetworkNodesIDGenerator,
 		idgenerators.NewSentEmailsIDGenerator,
+		pgseeds.New,
 	),
 )
 
