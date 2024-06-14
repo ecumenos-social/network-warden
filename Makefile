@@ -50,6 +50,10 @@ run-nw-migrate-up: .env
 run-nw-migrate-down: .env
 	go run cmd/network-warden/*.go migrate-down
 
+.PHONY: run-nw-seed
+run-nw-seed: .env
+	go run cmd/network-warden/*.go seed
+
 .PHONY: run-admin
 run-admin: .env
 	go run cmd/admin/*.go run

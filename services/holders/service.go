@@ -89,8 +89,12 @@ type InsertParams struct {
 	Password       string
 }
 
+func HashPassword(password string) (string, error) {
+	return hash.Hash(password)
+}
+
 func (s *service) Insert(ctx context.Context, logger *zap.Logger, params *InsertParams) (*models.Holder, error) {
-	passwordHash, err := hash.Hash(params.Password)
+	passwordHash, err := HashPassword(params.Password)
 	if err != nil {
 		logger.Error("failed to hash password", zap.Error(err))
 		return nil, err

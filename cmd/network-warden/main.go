@@ -31,6 +31,7 @@ func run(args []string) error {
 			runAppCmd,
 			runMigrateUpCmd,
 			runMigrateDownCmd,
+			runSeedCmd,
 		},
 	}
 
