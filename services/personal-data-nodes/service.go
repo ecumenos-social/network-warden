@@ -9,6 +9,8 @@ import (
 	errorwrapper "github.com/ecumenos-social/error-wrapper"
 	"github.com/ecumenos-social/network-warden/models"
 	"github.com/ecumenos-social/network-warden/services/idgenerators"
+	"github.com/ecumenos-social/toolkit/hash"
+	"github.com/ecumenos-social/toolkit/random"
 	"github.com/ecumenos-social/toolkitfx"
 	"go.uber.org/zap"
 )
@@ -16,10 +18,13 @@ import (
 type Repository interface {
 	InsertPersonalDataNode(ctx context.Context, pdn *models.PersonalDataNode) error
 	GetPersonalDataNodeByLabel(ctx context.Context, label string) (*models.PersonalDataNode, error)
+	GetPersonalDataNodeByID(ctx context.Context, id int64) (*models.PersonalDataNode, error)
+	ModifyPersonalDataNode(ctx context.Context, id int64, pdn *models.PersonalDataNode) error
 }
 
 type Service interface {
 	Insert(ctx context.Context, logger *zap.Logger, params *InsertParams) (*models.PersonalDataNode, error)
+	Activate(ctx context.Context, logger *zap.Logger, holderID, id int64) (*models.PersonalDataNode, string, error)
 }
 
 type service struct {
@@ -110,4 +115,42 @@ func (s *service) Insert(ctx context.Context, logger *zap.Logger, params *Insert
 	}
 
 	return pdn, nil
+}
+
+func HashAPIKey(apiKey string) string {
+	return hash.SHA1(apiKey)
+}
+
+func (s *service) Activate(ctx context.Context, logger *zap.Logger, holderID, id int64) (*models.PersonalDataNode, string, error) {
+	pdn, err := s.repo.GetPersonalDataNodeByID(ctx, id)
+	if err != nil {
+		logger.Error("failed to get personal data node by id", zap.Error(err))
+		return nil, "", err
+	}
+	if pdn == nil {
+		logger.Error("network node is not found")
+		return nil, "", errorwrapper.New("personal data node is not found")
+	}
+	if pdn.HolderID != holderID {
+		logger.Error("have no permissions for confirm personal data node")
+		return nil, "", errorwrapper.New("have no permissions for confirm personal data node")
+	}
+	if pdn.Status != models.PersonalDataNodeStatusApproved {
+		logger.Error("personal data node is not approved")
+		return nil, "", errorwrapper.New("personal data node is not approved")
+	}
+
+	apiKey, err := random.GenAPIKey("nn", fmt.Sprint(s.networkWardenID))
+	if err != nil {
+		logger.Error("failed to generate API key", zap.Error(err))
+		return nil, "", err
+	}
+	pdn.APIKeyHash = HashAPIKey(apiKey)
+
+	if err := s.repo.ModifyPersonalDataNode(ctx, id, pdn); err != nil {
+		logger.Error("failed to modify personal data node", zap.Error(err))
+		return nil, "", errorwrapper.New("failed to modify personal data node")
+	}
+
+	return pdn, apiKey, nil
 }

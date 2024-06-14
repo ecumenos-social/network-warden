@@ -110,6 +110,10 @@ func (s *service) Insert(ctx context.Context, logger *zap.Logger, params *Insert
 	return nn, nil
 }
 
+func HashAPIKey(apiKey string) string {
+	return hash.SHA1(apiKey)
+}
+
 func (s *service) Activate(ctx context.Context, logger *zap.Logger, holderID, id int64) (*models.NetworkNode, string, error) {
 	nn, err := s.repo.GetNetworkNodeByID(ctx, id)
 	if err != nil {
@@ -134,7 +138,7 @@ func (s *service) Activate(ctx context.Context, logger *zap.Logger, holderID, id
 		logger.Error("failed to generate API key", zap.Error(err))
 		return nil, "", err
 	}
-	nn.APIKeyHash = hash.SHA1(apiKey)
+	nn.APIKeyHash = HashAPIKey(apiKey)
 
 	if err := s.repo.ModifyNetworkNode(ctx, id, nn); err != nil {
 		logger.Error("failed to modify network node", zap.Error(err))
@@ -154,7 +158,7 @@ type InitiateParams struct {
 }
 
 func (s *service) Initiate(ctx context.Context, logger *zap.Logger, apiKey string, params *InitiateParams) error {
-	apiKeyHash := hash.SHA1(apiKey)
+	apiKeyHash := HashAPIKey(apiKey)
 	nn, err := s.repo.GetNetworkNodeByAPIKeyHash(ctx, apiKeyHash)
 	if err != nil {
 		logger.Error("failed to get network node by api key", zap.Error(err), zap.String("api-key", apiKey))
