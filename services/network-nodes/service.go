@@ -18,7 +18,7 @@ import (
 
 type Repository interface {
 	InsertNetworkNode(ctx context.Context, nn *models.NetworkNode) error
-	GetNetworkNodesByDomainName(ctx context.Context, domainName string) (*models.NetworkNode, error)
+	GetNetworkNodeByDomainName(ctx context.Context, domainName string) (*models.NetworkNode, error)
 	GetNetworkNodeByID(ctx context.Context, id int64) (*models.NetworkNode, error)
 	GetNetworkNodeByAPIKeyHash(ctx context.Context, apiKeyHash string) (*models.NetworkNode, error)
 	ModifyNetworkNode(ctx context.Context, id int64, nn *models.NetworkNode) error
@@ -27,7 +27,7 @@ type Repository interface {
 
 type Service interface {
 	Insert(ctx context.Context, logger *zap.Logger, params *InsertParams) (*models.NetworkNode, error)
-	Confirm(ctx context.Context, logger *zap.Logger, holderID, id int64) (nn *models.NetworkNode, apiKey string, err error)
+	Activate(ctx context.Context, logger *zap.Logger, holderID, id int64) (nn *models.NetworkNode, apiKey string, err error)
 	GetList(ctx context.Context, logger *zap.Logger, holderID int64, pagination *types.Pagination, onlyMy bool) ([]*models.NetworkNode, error)
 	Initiate(ctx context.Context, logger *zap.Logger, apiKey string, params *InitiateParams) error
 }
@@ -38,7 +38,7 @@ type service struct {
 	networkWardenID int64
 }
 
-func New(config *toolkitfx.AppConfig, repo Repository, g idgenerators.NetworkNodesIDGenerator) Service {
+func New(config *toolkitfx.NetworkWardenAppConfig, repo Repository, g idgenerators.NetworkNodesIDGenerator) Service {
 	return &service{
 		repo:            repo,
 		idgenerator:     g,
@@ -58,7 +58,7 @@ type InsertParams struct {
 
 func (s *service) Insert(ctx context.Context, logger *zap.Logger, params *InsertParams) (*models.NetworkNode, error) {
 	logger = logger.With(zap.String("network-node-domain-name", params.DomainName), zap.String("network-node-name", params.Name))
-	if nn, err := s.repo.GetNetworkNodesByDomainName(ctx, params.DomainName); err != nil || nn != nil {
+	if nn, err := s.repo.GetNetworkNodeByDomainName(ctx, params.DomainName); err != nil || nn != nil {
 		if err != nil {
 			logger.Error("failed to get network node by domain name", zap.Error(err))
 			return nil, err
@@ -110,7 +110,7 @@ func (s *service) Insert(ctx context.Context, logger *zap.Logger, params *Insert
 	return nn, nil
 }
 
-func (s *service) Confirm(ctx context.Context, logger *zap.Logger, holderID, id int64) (*models.NetworkNode, string, error) {
+func (s *service) Activate(ctx context.Context, logger *zap.Logger, holderID, id int64) (*models.NetworkNode, string, error) {
 	nn, err := s.repo.GetNetworkNodeByID(ctx, id)
 	if err != nil {
 		logger.Error("failed to get network node by id", zap.Error(err))
@@ -123,6 +123,10 @@ func (s *service) Confirm(ctx context.Context, logger *zap.Logger, holderID, id 
 	if nn.HolderID != holderID {
 		logger.Error("have no permissions for confirm network node")
 		return nil, "", errorwrapper.New("have no permissions for confirm network node")
+	}
+	if nn.Status != models.NetworkNodeStatusApproved {
+		logger.Error("network node is not approved")
+		return nil, "", errorwrapper.New("network node is not approved")
 	}
 
 	apiKey, err := random.GenAPIKey("nn", fmt.Sprint(s.networkWardenID))

@@ -31,6 +31,12 @@ var Flags = []cli.Flag{
 		Value:   "it is network warden",
 		EnvVars: []string{"NETWORK_WARDEN_APP_DESCRIPTION"},
 	},
+	&cli.StringFlag{
+		Name:    "nw-app-address-suffix",
+		Usage:   "it is unique address suffix specific for this network warden",
+		Value:   "nw",
+		EnvVars: []string{"NETWORK_WARDEN_APP_ADDRESS_SUFFIX"},
+	},
 	&cli.Int64Flag{
 		Name:    "nw-app-rate-limit-max-requests",
 		Usage:   "it is rate limit max requests amount",
