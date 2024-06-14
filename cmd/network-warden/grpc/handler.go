@@ -615,11 +615,30 @@ func (h *Handler) ActivatePersonalDataNode(ctx context.Context, req *pbv1.Activa
 	}, nil
 }
 
-func (h *Handler) InitiatePersonalDataNode(ctx context.Context, _ *pbv1.InitiatePersonalDataNodeRequest) (*pbv1.InitiatePersonalDataNodeResponse, error) {
+func (h *Handler) InitiatePersonalDataNode(ctx context.Context, req *pbv1.InitiatePersonalDataNodeRequest) (*pbv1.InitiatePersonalDataNodeResponse, error) {
 	logger := h.customizeLogger(ctx, "InitiatePersonalDataNode")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	params := &personaldatanodes.InitiateParams{
+		AccountsCapacity: req.AccountsCapacity,
+		IsOpen:           req.IsOpen,
+		Version:          req.Version,
+		RateLimit: &types.RateLimit{
+			MaxRequests: req.RateLimit.MaxRequests,
+			Interval:    req.RateLimit.Interval.AsDuration(),
+		},
+		CrawlRateLimit: &types.RateLimit{
+			MaxRequests: req.CrawlRateLimit.MaxRequests,
+			Interval:    req.CrawlRateLimit.Interval.AsDuration(),
+		},
+		IDGenNode: req.IdGenNode,
+	}
+	if err := h.personalDataNodesService.Initiate(ctx, logger, req.ApiKey, params); err != nil {
+		logger.Error("failed to initiate", zap.Error(err), zap.String("incoming-personal-data-node-api-key", req.ApiKey))
+		return nil, status.Error(codes.Internal, "failed to confirm")
+	}
+
+	return &pbv1.InitiatePersonalDataNodeResponse{Success: true}, nil
 }
 
 func (h *Handler) GetNetworkNodesList(ctx context.Context, req *pbv1.GetNetworkNodesListRequest) (*pbv1.GetNetworkNodesListResponse, error) {
