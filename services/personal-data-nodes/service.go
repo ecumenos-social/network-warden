@@ -11,6 +11,7 @@ import (
 	"github.com/ecumenos-social/network-warden/services/idgenerators"
 	"github.com/ecumenos-social/toolkit/hash"
 	"github.com/ecumenos-social/toolkit/random"
+	"github.com/ecumenos-social/toolkit/types"
 	"github.com/ecumenos-social/toolkitfx"
 	"go.uber.org/zap"
 )
@@ -19,12 +20,14 @@ type Repository interface {
 	InsertPersonalDataNode(ctx context.Context, pdn *models.PersonalDataNode) error
 	GetPersonalDataNodeByLabel(ctx context.Context, label string) (*models.PersonalDataNode, error)
 	GetPersonalDataNodeByID(ctx context.Context, id int64) (*models.PersonalDataNode, error)
+	GetPersonalDataNodeByAPIKeyHash(ctx context.Context, apiKeyHash string) (*models.PersonalDataNode, error)
 	ModifyPersonalDataNode(ctx context.Context, id int64, pdn *models.PersonalDataNode) error
 }
 
 type Service interface {
 	Insert(ctx context.Context, logger *zap.Logger, params *InsertParams) (*models.PersonalDataNode, error)
 	Activate(ctx context.Context, logger *zap.Logger, holderID, id int64) (*models.PersonalDataNode, string, error)
+	Initiate(ctx context.Context, logger *zap.Logger, apiKey string, params *InitiateParams) error
 }
 
 type service struct {
@@ -153,4 +156,45 @@ func (s *service) Activate(ctx context.Context, logger *zap.Logger, holderID, id
 	}
 
 	return pdn, apiKey, nil
+}
+
+type InitiateParams struct {
+	AccountsCapacity int64
+	IsOpen           bool
+	Version          string
+	RateLimit        *types.RateLimit
+	CrawlRateLimit   *types.RateLimit
+	IDGenNode        int64
+}
+
+func (s *service) Initiate(ctx context.Context, logger *zap.Logger, apiKey string, params *InitiateParams) error {
+	apiKeyHash := HashAPIKey(apiKey)
+	pdn, err := s.repo.GetPersonalDataNodeByAPIKeyHash(ctx, apiKeyHash)
+	if err != nil {
+		logger.Error("failed to get personal data node by api key", zap.Error(err), zap.String("api-key", apiKey))
+		return err
+	}
+	if pdn == nil {
+		logger.Error("personal data node is not found")
+		return errorwrapper.New("personal data node is not found")
+	}
+	if pdn.Status != models.PersonalDataNodeStatusApproved {
+		logger.Error("personal data node is not approved", zap.Int64("personal-data-node-id", pdn.ID), zap.String("personal-data-node-status", string(pdn.Status)))
+		return errorwrapper.New("personal data node must be approved")
+	}
+
+	pdn.AccountsCapacity = params.AccountsCapacity
+	pdn.IsOpen = params.IsOpen
+	pdn.Version = params.Version
+	pdn.RateLimitInterval = params.RateLimit.Interval
+	pdn.RateLimitMaxRequests = params.RateLimit.MaxRequests
+	pdn.CrawlRateLimitInterval = params.CrawlRateLimit.Interval
+	pdn.CrawlRateLimitMaxRequests = params.CrawlRateLimit.MaxRequests
+	pdn.IDGenNode = params.IDGenNode
+	if err := s.repo.ModifyPersonalDataNode(ctx, pdn.ID, pdn); err != nil {
+		logger.Error("failed to modify personal data node", zap.Error(err), zap.Int64("personal-data-node-id", pdn.ID))
+		return errorwrapper.New("failed to modify personal data node")
+	}
+
+	return nil
 }
