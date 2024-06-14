@@ -588,11 +588,31 @@ func (h *Handler) JoinPersonalDataNodeRegistrationWaitlist(ctx context.Context, 
 	}, nil
 }
 
-func (h *Handler) ActivatePersonalDataNode(ctx context.Context, _ *pbv1.ActivatePersonalDataNodeRequest) (*pbv1.ActivatePersonalDataNodeResponse, error) {
+func (h *Handler) ActivatePersonalDataNode(ctx context.Context, req *pbv1.ActivatePersonalDataNodeRequest) (*pbv1.ActivatePersonalDataNodeResponse, error) {
 	logger := h.customizeLogger(ctx, "ActivatePersonalDataNode")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	hs, err := h.parseToken(ctx, logger, req.Token, &req.RemoteMacAddress, jwt.TokenScopeAccess)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("holder-id", hs.HolderID))
+	id, err := strconv.ParseInt(req.Id, 10, 64)
+	if err != nil {
+		logger.Error("invalid personal data node ID", zap.Error(err), zap.String("incoming-personal-data-node-id", req.Id))
+		return nil, status.Error(codes.InvalidArgument, "invalid personal data node ID")
+	}
+
+	_, apiKey, err := h.personalDataNodesService.Activate(ctx, logger, hs.HolderID, id)
+	if err != nil {
+		logger.Error("failed to confirm", zap.Error(err), zap.String("incoming-personal-data-node-id", req.Id))
+		return nil, status.Error(codes.Internal, "failed to confirm")
+	}
+
+	return &pbv1.ActivatePersonalDataNodeResponse{
+		Success: true,
+		ApiKey:  apiKey,
+	}, nil
 }
 
 func (h *Handler) InitiatePersonalDataNode(ctx context.Context, _ *pbv1.InitiatePersonalDataNodeRequest) (*pbv1.InitiatePersonalDataNodeResponse, error) {
