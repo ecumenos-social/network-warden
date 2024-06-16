@@ -543,11 +543,41 @@ func (h *Handler) isHolderConfirmed(ctx context.Context, logger *zap.Logger, hol
 	return holder.Confirmed, nil
 }
 
-func (h *Handler) GetPersonalDataNodesList(ctx context.Context, _ *pbv1.GetPersonalDataNodesListRequest) (*pbv1.GetPersonalDataNodesListResponse, error) {
+func (h *Handler) GetPersonalDataNodesList(ctx context.Context, req *pbv1.GetPersonalDataNodesListRequest) (*pbv1.GetPersonalDataNodesListResponse, error) {
 	logger := h.customizeLogger(ctx, "GetPersonalDataNodesList")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	if req.Token == nil && req.OnlyMy != nil && *req.OnlyMy {
+		return nil, status.Error(codes.InvalidArgument, "token is required if only_my filter is used")
+	}
+	var holderID int64
+	if req.Token != nil {
+		hs, err := h.parseToken(ctx, logger, *req.Token, &req.RemoteMacAddress, jwt.TokenScopeAccess)
+		if err != nil {
+			return nil, err
+		}
+		logger = logger.With(zap.Int64("holder-id", hs.HolderID))
+		holderID = hs.HolderID
+	}
+
+	pdns, err := h.personalDataNodesService.GetList(
+		ctx,
+		logger,
+		holderID,
+		convertProtoPaginationToPagination(req.Pagination),
+		req.OnlyMy != nil && *req.OnlyMy,
+	)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get personal data nodes list")
+	}
+	data := make([]*pbv1.PersonalDataNode, 0, len(pdns))
+	for _, pdn := range pdns {
+		data = append(data, convertPersonalDataNodeToProtoPersonalDataNode(pdn))
+	}
+
+	return &pbv1.GetPersonalDataNodesListResponse{
+		Data: data,
+	}, nil
 }
 
 func (h *Handler) JoinPersonalDataNodeRegistrationWaitlist(ctx context.Context, req *pbv1.JoinPersonalDataNodeRegistrationWaitlistRequest) (*pbv1.JoinPersonalDataNodeRegistrationWaitlistResponse, error) {

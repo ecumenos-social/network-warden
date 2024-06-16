@@ -21,6 +21,7 @@ type Repository interface {
 	GetPersonalDataNodeByLabel(ctx context.Context, label string) (*models.PersonalDataNode, error)
 	GetPersonalDataNodeByID(ctx context.Context, id int64) (*models.PersonalDataNode, error)
 	GetPersonalDataNodeByAPIKeyHash(ctx context.Context, apiKeyHash string) (*models.PersonalDataNode, error)
+	GetPersonalDataNodesList(ctx context.Context, filters map[string]interface{}, pagination *types.Pagination) ([]*models.PersonalDataNode, error)
 	ModifyPersonalDataNode(ctx context.Context, id int64, pdn *models.PersonalDataNode) error
 }
 
@@ -28,6 +29,7 @@ type Service interface {
 	Insert(ctx context.Context, logger *zap.Logger, params *InsertParams) (*models.PersonalDataNode, error)
 	Activate(ctx context.Context, logger *zap.Logger, holderID, id int64) (*models.PersonalDataNode, string, error)
 	Initiate(ctx context.Context, logger *zap.Logger, apiKey string, params *InitiateParams) error
+	GetList(ctx context.Context, logger *zap.Logger, holderID int64, pagination *types.Pagination, onlyMy bool) ([]*models.PersonalDataNode, error)
 }
 
 type service struct {
@@ -197,4 +199,13 @@ func (s *service) Initiate(ctx context.Context, logger *zap.Logger, apiKey strin
 	}
 
 	return nil
+}
+
+func (s *service) GetList(ctx context.Context, logger *zap.Logger, holderID int64, pagination *types.Pagination, onlyMy bool) ([]*models.PersonalDataNode, error) {
+	filters := make(map[string]interface{}, 1)
+	if onlyMy {
+		filters["holder_id"] = holderID
+	}
+
+	return s.repo.GetPersonalDataNodesList(ctx, filters, pagination)
 }
