@@ -18,22 +18,30 @@ import (
 	"google.golang.org/grpc/keepalive"
 )
 
-func NewGRPCServer(lc fx.Lifecycle, config *fxgrpc.Config, sn toolkitfx.ServiceName) *fxgrpc.GRPCServer {
-	handler := NewHandler()
+type grpcServerParams struct {
+	fx.In
+
+	LC          fx.Lifecycle
+	Config      *fxgrpc.Config
+	ServiceName toolkitfx.ServiceName
+	Handler     *Handler
+}
+
+func NewGRPCServer(params grpcServerParams) *fxgrpc.GRPCServer {
 	grpcServer := fxgrpc.GRPCServer{}
-	lc.Append(fx.Hook{
+	params.LC.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			server := grpcutils.NewServer(string(sn), net.JoinHostPort(config.GRPC.Host, config.GRPC.Port))
+			server := grpcutils.NewServer(string(params.ServiceName), net.JoinHostPort(params.Config.GRPC.Host, params.Config.GRPC.Port))
 			server.Init(
 				grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
-					MinTime:             config.GRPC.KeepAliveEnforcementMinTime,
-					PermitWithoutStream: config.GRPC.KeepAliveEnforcementPermitWithoutStream,
+					MinTime:             params.Config.GRPC.KeepAliveEnforcementMinTime,
+					PermitWithoutStream: params.Config.GRPC.KeepAliveEnforcementPermitWithoutStream,
 				}),
 				grpcutils.ValidatorServerOption(),
 				grpcutils.RecoveryServerOption(),
-				grpc.KeepaliveParams(keepalive.ServerParameters{MaxConnectionAge: config.GRPC.MaxConnectionAge}),
+				grpc.KeepaliveParams(keepalive.ServerParameters{MaxConnectionAge: params.Config.GRPC.MaxConnectionAge}),
 			)
-			pbv1.RegisterAdminServiceServer(server.Server, handler)
+			pbv1.RegisterAdminServiceServer(server.Server, params.Handler)
 			grpcServer.Server = server
 
 			return nil
@@ -48,8 +56,7 @@ func NewGRPCServer(lc fx.Lifecycle, config *fxgrpc.Config, sn toolkitfx.ServiceN
 
 func NewGatewayHandler() *fxgrpc.HTTPGatewayHandler {
 	return &fxgrpc.HTTPGatewayHandler{
-		// TODO: uncomment when endpoints are added
-		// Handler: pbv1.RegisterAdminServiceHandler,
+		Handler: pbv1.RegisterAdminServiceHandler,
 	}
 }
 
@@ -60,6 +67,59 @@ func NewLivenessGateway() *fxgrpc.LivenessGatewayHandler {
 }
 
 func NewHTTPGateway(
+	lc fx.Lifecycle,
+	s fx.Shutdowner,
+	logger *zap.Logger,
+	cfg *fxgrpc.Config,
+	g *fxgrpc.HTTPGatewayHandler,
+) error {
+	httpAddr := net.JoinHostPort(cfg.HTTPGateway.Host, cfg.HTTPGateway.Port)
+	mux := runtime.NewServeMux()
+	conn := grpcutils.NewClientConnection(net.JoinHostPort(cfg.GRPC.Host, cfg.GRPC.Port))
+
+	zapConf := zap.NewProductionConfig()
+	zapConf.Level.SetLevel(zap.ErrorLevel)
+	errLogger, err := zapConf.Build()
+	if err != nil {
+		errLogger = logger.With()
+	}
+
+	_ = conn.Dial(grpcutils.DefaultDialOpts(errLogger)...)
+	if err := g.Handler(context.Background(), mux, conn.Connection); err != nil {
+		logger.Error("failed to register mapping service handler", zap.Error(err))
+	}
+
+	var httpServer *http.Server
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			go func() {
+				httpServer = &http.Server{Addr: httpAddr, Handler: mux}
+				logger.Info("starting HTTP gateway...", zap.String("addr", httpAddr))
+				err = httpServer.ListenAndServe()
+				if err != nil {
+					logger.Error("failed to start http server", zap.Error(err))
+					_ = s.Shutdown()
+				}
+			}()
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			_ = conn.CleanUp()
+			if httpServer != nil {
+				timeout, can := context.WithTimeout(context.Background(), 10*time.Second)
+				defer can()
+				if err := httpServer.Shutdown(timeout); err != nil {
+					logger.Error("stopped http server after gRPC failure", zap.Error(err))
+				}
+			}
+			return nil
+		},
+	})
+
+	return nil
+}
+
+func RunHTTPGateway(
 	lc fx.Lifecycle,
 	s fx.Shutdowner,
 	logger *zap.Logger,

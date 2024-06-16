@@ -13,17 +13,16 @@ var Dependencies = fx.Options(
 	fx.Supply(toolkitfx.ServiceName(configurations.ServiceName)),
 	fxlogger.Module,
 	fx.Provide(
+		grpc.NewHandler,
 		grpc.NewGRPCServer,
-		// TODO: uncomment when endpoints are added
-		// grpc.NewGatewayHandler,
-		// grpc.NewLivenessGateway,
+		grpc.NewGatewayHandler,
+		grpc.NewLivenessGateway,
 	),
 )
 
 var Invokes = fx.Invoke(
 	fxgrpc.RunRegisteredGRPCServer,
-	// TODO: uncomment when endpoints are added
-	// grpc.RunHTTPGateway,
-	// fxgrpc.RunHealthServer,
-	// fxgrpc.RunLivenessGateway,
+	grpc.RunHTTPGateway,
+	fxgrpc.RunHealthServer,
+	fxgrpc.RunLivenessGateway,
 )

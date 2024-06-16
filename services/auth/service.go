@@ -50,7 +50,7 @@ type InsertParams struct {
 	Token            string
 	RefreshToken     string
 	RemoteIPAddress  string
-	RemoteMACAddress string
+	RemoteMACAddress *string
 }
 
 func (s *service) Insert(ctx context.Context, logger *zap.Logger, params *InsertParams) (*models.HolderSession, error) {
@@ -59,6 +59,11 @@ func (s *service) Insert(ctx context.Context, logger *zap.Logger, params *Insert
 		zap.Int64("holder-session-id", id),
 		zap.Int64("holder-id", params.HolderID),
 	)
+	remoteMACAddress := sql.NullString{}
+	if params.RemoteMACAddress != nil {
+		remoteMACAddress.String = *params.RemoteMACAddress
+		remoteMACAddress.Valid = true
+	}
 	hs := &models.HolderSession{
 		ID:             id,
 		CreatedAt:      time.Now(),
@@ -74,10 +79,7 @@ func (s *service) Insert(ctx context.Context, logger *zap.Logger, params *Insert
 			String: params.RemoteIPAddress,
 			Valid:  true,
 		},
-		RemoteMACAddress: sql.NullString{
-			String: params.RemoteMACAddress,
-			Valid:  true,
-		},
+		RemoteMACAddress: remoteMACAddress,
 	}
 
 	if err := s.repo.InsertHolderSession(ctx, hs); err != nil {

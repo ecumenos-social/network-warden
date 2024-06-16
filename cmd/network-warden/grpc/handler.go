@@ -93,7 +93,7 @@ func (h *Handler) customizeLogger(ctx context.Context, operationName string) *za
 	return l
 }
 
-func (h *Handler) CheckEmails(ctx context.Context, req *pbv1.CheckEmailsRequest) (*pbv1.CheckEmailsResponse, error) {
+func (h *Handler) CheckEmails(ctx context.Context, req *pbv1.NetworkWardenServiceCheckEmailsRequest) (*pbv1.NetworkWardenServiceCheckEmailsResponse, error) {
 	logger := h.customizeLogger(ctx, "CheckEmails")
 	defer logger.Info("request processed")
 
@@ -107,13 +107,13 @@ func (h *Handler) CheckEmails(ctx context.Context, req *pbv1.CheckEmailsRequest)
 		errs = append(errs, err.Error())
 	}
 
-	return &pbv1.CheckEmailsResponse{
+	return &pbv1.NetworkWardenServiceCheckEmailsResponse{
 		Valid:   len(errs) == 0,
 		Results: errs,
 	}, nil
 }
 
-func (h *Handler) CheckPhoneNumbers(ctx context.Context, req *pbv1.CheckPhoneNumbersRequest) (*pbv1.CheckPhoneNumbersResponse, error) {
+func (h *Handler) CheckPhoneNumbers(ctx context.Context, req *pbv1.NetworkWardenServiceCheckPhoneNumbersRequest) (*pbv1.NetworkWardenServiceCheckPhoneNumbersResponse, error) {
 	logger := h.customizeLogger(ctx, "CheckPhoneNumbers")
 	defer logger.Info("request processed")
 
@@ -127,13 +127,13 @@ func (h *Handler) CheckPhoneNumbers(ctx context.Context, req *pbv1.CheckPhoneNum
 		errs = append(errs, err.Error())
 	}
 
-	return &pbv1.CheckPhoneNumbersResponse{
+	return &pbv1.NetworkWardenServiceCheckPhoneNumbersResponse{
 		Valid:   len(errs) == 0,
 		Results: errs,
 	}, nil
 }
 
-func (h *Handler) RegisterHolder(ctx context.Context, req *pbv1.RegisterHolderRequest) (*pbv1.RegisterHolderResponse, error) {
+func (h *Handler) RegisterHolder(ctx context.Context, req *pbv1.NetworkWardenServiceRegisterHolderRequest) (*pbv1.NetworkWardenServiceRegisterHolderResponse, error) {
 	logger := h.customizeLogger(ctx, "RegisterHolder")
 	defer logger.Info("request processed")
 
@@ -160,22 +160,23 @@ func (h *Handler) RegisterHolder(ctx context.Context, req *pbv1.RegisterHolderRe
 	if err != nil {
 		return nil, err
 	}
-	approach := pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_PHONE_NUMBER
+
+	approach := pbv1.NetworkWardenServiceConfirmationApproach_NETWORK_WARDEN_SERVICE_CONFIRMATION_APPROACH_PHONE_NUMBER
 	if len(holder.Emails) > 0 {
-		approach = pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_EMAIL
+		approach = pbv1.NetworkWardenServiceConfirmationApproach_NETWORK_WARDEN_SERVICE_CONFIRMATION_APPROACH_EMAIL
 	}
 	if err := h.sendConfirmationMessage(ctx, logger, approach, holder); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed send confirmation (error = %v)", err.Error())
 	}
 
-	return &pbv1.RegisterHolderResponse{
+	return &pbv1.NetworkWardenServiceRegisterHolderResponse{
 		Token:                token,
 		RefreshToken:         refreshToken,
 		ConfirmationApproach: approach,
 	}, nil
 }
 
-func (h *Handler) createSession(ctx context.Context, logger *zap.Logger, holderID int64, ip, mac string) (string, string, error) {
+func (h *Handler) createSession(ctx context.Context, logger *zap.Logger, holderID int64, ip string, mac *string) (string, string, error) {
 	token, refreshToken, err := h.jwt.CreateTokens(ctx, logger, fmt.Sprint(holderID))
 	if err != nil {
 		return "", "", status.Errorf(codes.Internal, "failed create tokens (error = %v)", err.Error())
@@ -195,7 +196,7 @@ func (h *Handler) createSession(ctx context.Context, logger *zap.Logger, holderI
 	return token, refreshToken, nil
 }
 
-func (h *Handler) validateRegisterHolderRequest(ctx context.Context, logger *zap.Logger, req *pbv1.RegisterHolderRequest) error {
+func (h *Handler) validateRegisterHolderRequest(ctx context.Context, logger *zap.Logger, req *pbv1.NetworkWardenServiceRegisterHolderRequest) error {
 	if err := req.ValidateAll(); err != nil {
 		return status.Errorf(codes.InvalidArgument, "invalid request (error = %v)", err.Error())
 	}
@@ -236,14 +237,14 @@ func (h *Handler) validateRegisterHolderRequest(ctx context.Context, logger *zap
 	return nil
 }
 
-func (h *Handler) sendConfirmationMessage(ctx context.Context, logger *zap.Logger, approach pbv1.ConfirmationApproach, holder *models.Holder) error {
-	if approach == pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_EMAIL {
+func (h *Handler) sendConfirmationMessage(ctx context.Context, logger *zap.Logger, approach pbv1.NetworkWardenServiceConfirmationApproach, holder *models.Holder) error {
+	if approach == pbv1.NetworkWardenServiceConfirmationApproach_NETWORK_WARDEN_SERVICE_CONFIRMATION_APPROACH_EMAIL {
 		if err := h.emailer.SendConfirmationOfRegistration(ctx, logger, holder.Emails[0], holder.Emails[0], holder.ConfirmationCode); err != nil {
 			return err
 		}
 		return nil
 	}
-	if approach == pbv1.ConfirmationApproach_CONFIRMATION_APPROACH_PHONE_NUMBER {
+	if approach == pbv1.NetworkWardenServiceConfirmationApproach_NETWORK_WARDEN_SERVICE_CONFIRMATION_APPROACH_PHONE_NUMBER {
 		if err := h.smsSender.Send(ctx); err != nil {
 			return err
 		}
@@ -285,11 +286,11 @@ func (h *Handler) parseToken(ctx context.Context, logger *zap.Logger, token stri
 	return hs, nil
 }
 
-func (h *Handler) ConfirmHolderRegistration(ctx context.Context, req *pbv1.ConfirmHolderRegistrationRequest) (*pbv1.ConfirmHolderRegistrationResponse, error) {
+func (h *Handler) ConfirmHolderRegistration(ctx context.Context, req *pbv1.NetworkWardenServiceConfirmHolderRegistrationRequest) (*pbv1.NetworkWardenServiceConfirmHolderRegistrationResponse, error) {
 	logger := h.customizeLogger(ctx, "ConfirmHolderRegistration")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, logger, req.Token, &req.RemoteMacAddress, jwt.TokenScopeAccess)
+	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
 	if err != nil {
 		return nil, err
 	}
@@ -300,14 +301,14 @@ func (h *Handler) ConfirmHolderRegistration(ctx context.Context, req *pbv1.Confi
 		return nil, status.Errorf(codes.InvalidArgument, "failed to confirm holder registration (err = %v)", err.Error())
 	}
 
-	return &pbv1.ConfirmHolderRegistrationResponse{Success: true}, nil
+	return &pbv1.NetworkWardenServiceConfirmHolderRegistrationResponse{Success: true}, nil
 }
 
-func (h *Handler) ResendConfirmationCode(ctx context.Context, req *pbv1.ResendConfirmationCodeRequest) (*pbv1.ResendConfirmationCodeResponse, error) {
+func (h *Handler) ResendConfirmationCode(ctx context.Context, req *pbv1.NetworkWardenServiceResendConfirmationCodeRequest) (*pbv1.NetworkWardenServiceResendConfirmationCodeResponse, error) {
 	logger := h.customizeLogger(ctx, "ResendConfirmationCode")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, logger, req.Token, &req.RemoteMacAddress, jwt.TokenScopeAccess)
+	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
 	if err != nil {
 		return nil, err
 	}
@@ -336,10 +337,10 @@ func (h *Handler) ResendConfirmationCode(ctx context.Context, req *pbv1.ResendCo
 		return nil, status.Errorf(codes.Internal, "failed send confirmation (error = %v)", err.Error())
 	}
 
-	return &pbv1.ResendConfirmationCodeResponse{Success: true}, nil
+	return &pbv1.NetworkWardenServiceResendConfirmationCodeResponse{Success: true}, nil
 }
 
-func (h *Handler) LoginHolder(ctx context.Context, req *pbv1.LoginHolderRequest) (*pbv1.LoginHolderResponse, error) {
+func (h *Handler) LoginHolder(ctx context.Context, req *pbv1.NetworkWardenServiceLoginHolderRequest) (*pbv1.NetworkWardenServiceLoginHolderResponse, error) {
 	logger := h.customizeLogger(ctx, "LoginHolder")
 	defer logger.Info("request processed")
 
@@ -360,17 +361,17 @@ func (h *Handler) LoginHolder(ctx context.Context, req *pbv1.LoginHolderRequest)
 		return nil, err
 	}
 
-	return &pbv1.LoginHolderResponse{
+	return &pbv1.NetworkWardenServiceLoginHolderResponse{
 		Token:        token,
 		RefreshToken: refreshToken,
 	}, nil
 }
 
-func (h *Handler) LogoutHolder(ctx context.Context, req *pbv1.LogoutHolderRequest) (*pbv1.LogoutHolderResponse, error) {
+func (h *Handler) LogoutHolder(ctx context.Context, req *pbv1.NetworkWardenServiceLogoutHolderRequest) (*pbv1.NetworkWardenServiceLogoutHolderResponse, error) {
 	logger := h.customizeLogger(ctx, "LogoutHolder")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, logger, req.Token, &req.RemoteMacAddress, jwt.TokenScopeAccess)
+	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
 	if err != nil {
 		return nil, err
 	}
@@ -380,14 +381,14 @@ func (h *Handler) LogoutHolder(ctx context.Context, req *pbv1.LogoutHolderReques
 		return nil, status.Errorf(codes.Internal, "failed modify session (error = %v)", err.Error())
 	}
 
-	return &pbv1.LogoutHolderResponse{Success: true}, nil
+	return &pbv1.NetworkWardenServiceLogoutHolderResponse{Success: true}, nil
 }
 
-func (h *Handler) RefreshHolderToken(ctx context.Context, req *pbv1.RefreshHolderTokenRequest) (*pbv1.RefreshHolderTokenResponse, error) {
+func (h *Handler) RefreshHolderToken(ctx context.Context, req *pbv1.NetworkWardenServiceRefreshHolderTokenRequest) (*pbv1.NetworkWardenServiceRefreshHolderTokenResponse, error) {
 	logger := h.customizeLogger(ctx, "RefreshHolderToken")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, logger, req.RefreshToken, &req.RemoteMacAddress, jwt.TokenScopeRefresh)
+	hs, err := h.parseToken(ctx, logger, req.RefreshToken, req.RemoteMacAddress, jwt.TokenScopeRefresh)
 	if err != nil {
 		return nil, err
 	}
@@ -408,17 +409,17 @@ func (h *Handler) RefreshHolderToken(ctx context.Context, req *pbv1.RefreshHolde
 		return nil, status.Errorf(codes.Internal, "failed modify session (error = %v)", err.Error())
 	}
 
-	return &pbv1.RefreshHolderTokenResponse{
+	return &pbv1.NetworkWardenServiceRefreshHolderTokenResponse{
 		Token:        token,
 		RefreshToken: refreshToken,
 	}, nil
 }
 
-func (h *Handler) ChangeHolderPassword(ctx context.Context, req *pbv1.ChangeHolderPasswordRequest) (*pbv1.ChangeHolderPasswordResponse, error) {
+func (h *Handler) ChangeHolderPassword(ctx context.Context, req *pbv1.NetworkWardenServiceChangeHolderPasswordRequest) (*pbv1.NetworkWardenServiceChangeHolderPasswordResponse, error) {
 	logger := h.customizeLogger(ctx, "ChangeHolderPassword")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, logger, req.Token, &req.RemoteMacAddress, jwt.TokenScopeAccess)
+	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
 	if err != nil {
 		return nil, err
 	}
@@ -439,14 +440,14 @@ func (h *Handler) ChangeHolderPassword(ctx context.Context, req *pbv1.ChangeHold
 		return nil, status.Error(codes.InvalidArgument, "failed to change holder's password")
 	}
 
-	return &pbv1.ChangeHolderPasswordResponse{Success: true}, nil
+	return &pbv1.NetworkWardenServiceChangeHolderPasswordResponse{Success: true}, nil
 }
 
-func (h *Handler) ModifyHolder(ctx context.Context, req *pbv1.ModifyHolderRequest) (*pbv1.ModifyHolderResponse, error) {
+func (h *Handler) ModifyHolder(ctx context.Context, req *pbv1.NetworkWardenServiceModifyHolderRequest) (*pbv1.NetworkWardenServiceModifyHolderResponse, error) {
 	logger := h.customizeLogger(ctx, "ModifyHolder")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, logger, req.Token, &req.RemoteMacAddress, jwt.TokenScopeAccess)
+	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
 	if err != nil {
 		return nil, err
 	}
@@ -470,14 +471,14 @@ func (h *Handler) ModifyHolder(ctx context.Context, req *pbv1.ModifyHolderReques
 		return nil, status.Error(codes.InvalidArgument, "failed to modify holder")
 	}
 
-	return &pbv1.ModifyHolderResponse{Success: true}, nil
+	return &pbv1.NetworkWardenServiceModifyHolderResponse{Success: true}, nil
 }
 
-func (h *Handler) GetHolder(ctx context.Context, req *pbv1.GetHolderRequest) (*pbv1.GetHolderResponse, error) {
+func (h *Handler) GetHolder(ctx context.Context, req *pbv1.NetworkWardenServiceGetHolderRequest) (*pbv1.NetworkWardenServiceGetHolderResponse, error) {
 	logger := h.customizeLogger(ctx, "GetHolder")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, logger, req.Token, &req.RemoteMacAddress, jwt.TokenScopeAccess)
+	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
 	if err != nil {
 		return nil, err
 	}
@@ -497,14 +498,14 @@ func (h *Handler) GetHolder(ctx context.Context, req *pbv1.GetHolderRequest) (*p
 		return nil, status.Error(codes.InvalidArgument, "holder not found")
 	}
 
-	return &pbv1.GetHolderResponse{Data: convertHolderToProtoHolder(holder)}, nil
+	return &pbv1.NetworkWardenServiceGetHolderResponse{Data: convertHolderToProtoHolder(holder)}, nil
 }
 
-func (h *Handler) DeleteHolder(ctx context.Context, req *pbv1.DeleteHolderRequest) (*pbv1.DeleteHolderResponse, error) {
+func (h *Handler) DeleteHolder(ctx context.Context, req *pbv1.NetworkWardenServiceDeleteHolderRequest) (*pbv1.NetworkWardenServiceDeleteHolderResponse, error) {
 	logger := h.customizeLogger(ctx, "DeleteHolder")
 	defer logger.Info("request processed")
 
-	hs, err := h.parseToken(ctx, logger, req.Token, &req.RemoteMacAddress, jwt.TokenScopeAccess)
+	hs, err := h.parseToken(ctx, logger, req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
 	if err != nil {
 		return nil, err
 	}
@@ -526,7 +527,7 @@ func (h *Handler) DeleteHolder(ctx context.Context, req *pbv1.DeleteHolderReques
 		return nil, status.Errorf(codes.Internal, "failed to delete holder, err=%v", err.Error())
 	}
 
-	return &pbv1.DeleteHolderResponse{Success: true}, nil
+	return &pbv1.NetworkWardenServiceDeleteHolderResponse{Success: true}, nil
 }
 
 func (h *Handler) isHolderConfirmed(ctx context.Context, logger *zap.Logger, holderID int64) (bool, error) {
@@ -543,7 +544,7 @@ func (h *Handler) isHolderConfirmed(ctx context.Context, logger *zap.Logger, hol
 	return holder.Confirmed, nil
 }
 
-func (h *Handler) GetPersonalDataNodesList(ctx context.Context, req *pbv1.GetPersonalDataNodesListRequest) (*pbv1.GetPersonalDataNodesListResponse, error) {
+func (h *Handler) GetPersonalDataNodesList(ctx context.Context, req *pbv1.NetworkWardenServiceGetPersonalDataNodesListRequest) (*pbv1.NetworkWardenServiceGetPersonalDataNodesListResponse, error) {
 	logger := h.customizeLogger(ctx, "GetPersonalDataNodesList")
 	defer logger.Info("request processed")
 
@@ -552,7 +553,7 @@ func (h *Handler) GetPersonalDataNodesList(ctx context.Context, req *pbv1.GetPer
 	}
 	var holderID int64
 	if req.Token != nil {
-		hs, err := h.parseToken(ctx, logger, *req.Token, &req.RemoteMacAddress, jwt.TokenScopeAccess)
+		hs, err := h.parseToken(ctx, logger, *req.Token, req.RemoteMacAddress, jwt.TokenScopeAccess)
 		if err != nil {
 			return nil, err
 		}
@@ -575,12 +576,12 @@ func (h *Handler) GetPersonalDataNodesList(ctx context.Context, req *pbv1.GetPer
 		data = append(data, convertPersonalDataNodeToProtoPersonalDataNode(pdn))
 	}
 
-	return &pbv1.GetPersonalDataNodesListResponse{
+	return &pbv1.NetworkWardenServiceGetPersonalDataNodesListResponse{
 		Data: data,
 	}, nil
 }
 
-func (h *Handler) JoinPersonalDataNodeRegistrationWaitlist(ctx context.Context, req *pbv1.JoinPersonalDataNodeRegistrationWaitlistRequest) (*pbv1.JoinPersonalDataNodeRegistrationWaitlistResponse, error) {
+func (h *Handler) JoinPersonalDataNodeRegistrationWaitlist(ctx context.Context, req *pbv1.NetworkWardenServiceJoinPersonalDataNodeRegistrationWaitlistRequest) (*pbv1.NetworkWardenServiceJoinPersonalDataNodeRegistrationWaitlistResponse, error) {
 	logger := h.customizeLogger(ctx, "JoinPersonalDataNodeRegistrationWaitlist")
 	defer logger.Info("request processed")
 
@@ -612,13 +613,13 @@ func (h *Handler) JoinPersonalDataNodeRegistrationWaitlist(ctx context.Context, 
 		return nil, status.Errorf(codes.Internal, "failed to insert personal data node, err = %v", err.Error())
 	}
 
-	return &pbv1.JoinPersonalDataNodeRegistrationWaitlistResponse{
+	return &pbv1.NetworkWardenServiceJoinPersonalDataNodeRegistrationWaitlistResponse{
 		Success: true,
 		Id:      fmt.Sprint(pdn.ID),
 	}, nil
 }
 
-func (h *Handler) ActivatePersonalDataNode(ctx context.Context, req *pbv1.ActivatePersonalDataNodeRequest) (*pbv1.ActivatePersonalDataNodeResponse, error) {
+func (h *Handler) ActivatePersonalDataNode(ctx context.Context, req *pbv1.NetworkWardenServiceActivatePersonalDataNodeRequest) (*pbv1.NetworkWardenServiceActivatePersonalDataNodeResponse, error) {
 	logger := h.customizeLogger(ctx, "ActivatePersonalDataNode")
 	defer logger.Info("request processed")
 
@@ -639,13 +640,13 @@ func (h *Handler) ActivatePersonalDataNode(ctx context.Context, req *pbv1.Activa
 		return nil, status.Error(codes.Internal, "failed to confirm")
 	}
 
-	return &pbv1.ActivatePersonalDataNodeResponse{
+	return &pbv1.NetworkWardenServiceActivatePersonalDataNodeResponse{
 		Success: true,
 		ApiKey:  apiKey,
 	}, nil
 }
 
-func (h *Handler) InitiatePersonalDataNode(ctx context.Context, req *pbv1.InitiatePersonalDataNodeRequest) (*pbv1.InitiatePersonalDataNodeResponse, error) {
+func (h *Handler) InitiatePersonalDataNode(ctx context.Context, req *pbv1.NetworkWardenServiceInitiatePersonalDataNodeRequest) (*pbv1.NetworkWardenServiceInitiatePersonalDataNodeResponse, error) {
 	logger := h.customizeLogger(ctx, "InitiatePersonalDataNode")
 	defer logger.Info("request processed")
 
@@ -668,10 +669,10 @@ func (h *Handler) InitiatePersonalDataNode(ctx context.Context, req *pbv1.Initia
 		return nil, status.Error(codes.Internal, "failed to confirm")
 	}
 
-	return &pbv1.InitiatePersonalDataNodeResponse{Success: true}, nil
+	return &pbv1.NetworkWardenServiceInitiatePersonalDataNodeResponse{Success: true}, nil
 }
 
-func (h *Handler) GetNetworkNodesList(ctx context.Context, req *pbv1.GetNetworkNodesListRequest) (*pbv1.GetNetworkNodesListResponse, error) {
+func (h *Handler) GetNetworkNodesList(ctx context.Context, req *pbv1.NetworkWardenServiceGetNetworkNodesListRequest) (*pbv1.NetworkWardenServiceGetNetworkNodesListResponse, error) {
 	logger := h.customizeLogger(ctx, "GetNetworkNodesList")
 	defer logger.Info("request processed")
 
@@ -703,12 +704,12 @@ func (h *Handler) GetNetworkNodesList(ctx context.Context, req *pbv1.GetNetworkN
 		data = append(data, convertNetworkNodeToProtoNetworkNode(nn))
 	}
 
-	return &pbv1.GetNetworkNodesListResponse{
+	return &pbv1.NetworkWardenServiceGetNetworkNodesListResponse{
 		Data: data,
 	}, nil
 }
 
-func (h *Handler) JoinNetworkNodeRegistrationWaitlist(ctx context.Context, req *pbv1.JoinNetworkNodeRegistrationWaitlistRequest) (*pbv1.JoinNetworkNodeRegistrationWaitlistResponse, error) {
+func (h *Handler) JoinNetworkNodeRegistrationWaitlist(ctx context.Context, req *pbv1.NetworkWardenServiceJoinNetworkNodeRegistrationWaitlistRequest) (*pbv1.NetworkWardenServiceJoinNetworkNodeRegistrationWaitlistResponse, error) {
 	logger := h.customizeLogger(ctx, "JoinNetworkNodeRegistrationWaitlist")
 	defer logger.Info("request processed")
 
@@ -740,13 +741,13 @@ func (h *Handler) JoinNetworkNodeRegistrationWaitlist(ctx context.Context, req *
 		return nil, status.Errorf(codes.Internal, "failed to insert network node, err = %v", err.Error())
 	}
 
-	return &pbv1.JoinNetworkNodeRegistrationWaitlistResponse{
+	return &pbv1.NetworkWardenServiceJoinNetworkNodeRegistrationWaitlistResponse{
 		Success: true,
 		Id:      fmt.Sprint(nn.ID),
 	}, nil
 }
 
-func (h *Handler) ActivateNetworkNode(ctx context.Context, req *pbv1.ActivateNetworkNodeRequest) (*pbv1.ActivateNetworkNodeResponse, error) {
+func (h *Handler) ActivateNetworkNode(ctx context.Context, req *pbv1.NetworkWardenServiceActivateNetworkNodeRequest) (*pbv1.NetworkWardenServiceActivateNetworkNodeResponse, error) {
 	logger := h.customizeLogger(ctx, "ActivateNetworkNode")
 	defer logger.Info("request processed")
 
@@ -767,13 +768,13 @@ func (h *Handler) ActivateNetworkNode(ctx context.Context, req *pbv1.ActivateNet
 		return nil, status.Error(codes.Internal, "failed to confirm")
 	}
 
-	return &pbv1.ActivateNetworkNodeResponse{
+	return &pbv1.NetworkWardenServiceActivateNetworkNodeResponse{
 		Success: true,
 		ApiKey:  apiKey,
 	}, nil
 }
 
-func (h *Handler) InitiateNetworkNode(ctx context.Context, req *pbv1.InitiateNetworkNodeRequest) (*pbv1.InitiateNetworkNodeResponse, error) {
+func (h *Handler) InitiateNetworkNode(ctx context.Context, req *pbv1.NetworkWardenServiceInitiateNetworkNodeRequest) (*pbv1.NetworkWardenServiceInitiateNetworkNodeResponse, error) {
 	logger := h.customizeLogger(ctx, "InitiateNetworkNode")
 	defer logger.Info("request processed")
 
@@ -796,17 +797,17 @@ func (h *Handler) InitiateNetworkNode(ctx context.Context, req *pbv1.InitiateNet
 		return nil, status.Error(codes.Internal, "failed to confirm")
 	}
 
-	return &pbv1.InitiateNetworkNodeResponse{Success: true}, nil
+	return &pbv1.NetworkWardenServiceInitiateNetworkNodeResponse{Success: true}, nil
 }
 
-func (h *Handler) GetNetworkWardensList(ctx context.Context, req *pbv1.GetNetworkWardensListRequest) (*pbv1.GetNetworkWardensListResponse, error) {
+func (h *Handler) GetNetworkWardensList(ctx context.Context, req *pbv1.NetworkWardenServiceGetNetworkWardensListRequest) (*pbv1.NetworkWardenServiceGetNetworkWardensListResponse, error) {
 	logger := h.customizeLogger(ctx, "GetNetworkWardensList")
 	defer logger.Info("request processed")
 
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) RegisterNetworkWarden(ctx context.Context, _ *pbv1.RegisterNetworkWardenRequest) (*pbv1.RegisterNetworkWardenResponse, error) {
+func (h *Handler) RegisterNetworkWarden(ctx context.Context, _ *pbv1.NetworkWardenServiceRegisterNetworkWardenRequest) (*pbv1.NetworkWardenServiceRegisterNetworkWardenResponse, error) {
 	logger := h.customizeLogger(ctx, "RegisterNetworkWarden")
 	defer logger.Info("request processed")
 
