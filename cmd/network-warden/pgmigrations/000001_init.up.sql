@@ -102,4 +102,34 @@ create unique index personal_data_nodes_label_uindex on personal_data_nodes (lab
 create unique index personal_data_nodes_address_uindex on personal_data_nodes (address);
 create index personal_data_nodes_status_index on personal_data_nodes (status);
 
+create table public.network_wardens
+(
+  id                            bigint primary key,
+  created_at                    timestamp(0) with time zone default current_timestamp not null,
+  last_modified_at              timestamp(0) with time zone default current_timestamp not null,
+  label                         text not null,
+  address                       text not null,
+  name                          text not null,
+  description                   text not null,
+  location                      geography(point, 4326),
+  pdn_capacity                  bigint not null,
+  nn_capacity                   bigint not null,
+  alive                         boolean not null,
+  last_pinged_at                timestamp(0) with time zone default current_timestamp,
+  is_open                       boolean not null,
+  url                           text not null,
+  version                       text not null,
+  rate_limit_max_requests       bigint not null,
+  rate_limit_interval           bigint not null,
+  crawl_rate_limit_max_requests bigint not null,
+  crawl_rate_limit_interval     bigint not null,
+  status                        text not null,
+  id_gen_node                   bigint not null
+);
+
+create unique index network_wardens_label_uindex on network_wardens (label);
+create unique index network_wardens_address_uindex on network_wardens (address);
+create index network_wardens_status_index on network_wardens (status);
+
 commit;
+
