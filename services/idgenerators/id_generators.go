@@ -59,3 +59,14 @@ func NewPersonalDataNodesIDGenerator(config *PersonalDataNodesIDGeneratorConfig)
 		Low: config.LowNodeID,
 	})
 }
+
+type NetworkWardensIDGeneratorConfig fxidgenerator.Config
+
+type NetworkWardensIDGenerator idgenerator.Generator
+
+func NewNetworkWardensIDGenerator(config *NetworkWardensIDGeneratorConfig) (NetworkWardensIDGenerator, error) {
+	return idgenerator.New(&idgenerator.NodeID{
+		Top: config.TopNodeID,
+		Low: config.LowNodeID,
+	})
+}

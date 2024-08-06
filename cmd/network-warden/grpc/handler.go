@@ -14,6 +14,7 @@ import (
 	"github.com/ecumenos-social/network-warden/services/holders"
 	"github.com/ecumenos-social/network-warden/services/jwt"
 	networknodes "github.com/ecumenos-social/network-warden/services/network-nodes"
+	networkwardens "github.com/ecumenos-social/network-warden/services/network-wardens"
 	personaldatanodes "github.com/ecumenos-social/network-warden/services/personal-data-nodes"
 	smssender "github.com/ecumenos-social/network-warden/services/sms-sender"
 	pbv1 "github.com/ecumenos-social/schemas/proto/gen/networkwarden/v1"
@@ -37,6 +38,7 @@ type Handler struct {
 	smsSender                smssender.Service
 	networkNodesService      networknodes.Service
 	personalDataNodesService personaldatanodes.Service
+	networkWardensService    networkwardens.Service
 	logger                   *zap.Logger
 
 	networkWardenID int64
@@ -55,6 +57,7 @@ type handlerParams struct {
 	SMSSenderService         smssender.Service
 	NetworkNodesService      networknodes.Service
 	PersonalDataNodesService personaldatanodes.Service
+	NetworkWardensService    networkwardens.Service
 	Logger                   *zap.Logger
 }
 
@@ -67,6 +70,7 @@ func NewHandler(params handlerParams) *Handler {
 		smsSender:                params.SMSSenderService,
 		networkNodesService:      params.NetworkNodesService,
 		personalDataNodesService: params.PersonalDataNodesService,
+		networkWardensService:    params.NetworkWardensService,
 		logger:                   params.Logger,
 
 		networkWardenID: params.Config.ID,
@@ -807,9 +811,30 @@ func (h *Handler) GetNetworkWardensList(ctx context.Context, req *pbv1.NetworkWa
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) RegisterNetworkWarden(ctx context.Context, _ *pbv1.NetworkWardenServiceRegisterNetworkWardenRequest) (*pbv1.NetworkWardenServiceRegisterNetworkWardenResponse, error) {
+func (h *Handler) RegisterNetworkWarden(ctx context.Context, req *pbv1.NetworkWardenServiceRegisterNetworkWardenRequest) (*pbv1.NetworkWardenServiceRegisterNetworkWardenResponse, error) {
 	logger := h.customizeLogger(ctx, "RegisterNetworkWarden")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	params := &networkwardens.InsertParams{
+		Name:        req.Name,
+		Description: req.Description,
+		Label:       req.AddressSuffix,
+		Location:    &models.Location{},
+		IsOpen:      true,
+		Version:     req.Version,
+		URL:         req.Url,
+		PDNCapacity: int64(req.PdnCapacity),
+		NNCapacity:  int64(req.NnCapacity),
+		RateLimit: &types.RateLimit{
+			MaxRequests: req.RateLimit.MaxRequests,
+			Interval:    req.RateLimit.Interval.AsDuration(),
+		},
+		IDGenNode: -1,
+	}
+	if _, err := h.networkWardensService.Insert(ctx, logger, params); err != nil {
+		logger.Error("failed to register", zap.Error(err), zap.Any("request-body", req))
+		return nil, status.Error(codes.Internal, "failed to register")
+	}
+
+	return &pbv1.NetworkWardenServiceRegisterNetworkWardenResponse{Success: true}, nil
 }

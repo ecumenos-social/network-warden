@@ -6,5 +6,6 @@ drop table if exists sent_emails cascade;
 
 drop table if exists network_nodes cascade;
 drop table if exists personal_data_nodes cascade;
+drop table if exists network_wardens cascade;
 
 commit;

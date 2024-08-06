@@ -12,6 +12,7 @@ import (
 	"github.com/ecumenos-social/network-warden/services/idgenerators"
 	"github.com/ecumenos-social/network-warden/services/jwt"
 	networknodes "github.com/ecumenos-social/network-warden/services/network-nodes"
+	networkwardens "github.com/ecumenos-social/network-warden/services/network-wardens"
 	personaldatanodes "github.com/ecumenos-social/network-warden/services/personal-data-nodes"
 	smssender "github.com/ecumenos-social/network-warden/services/sms-sender"
 	"github.com/ecumenos-social/toolkitfx"
@@ -37,10 +38,12 @@ var Dependencies = fx.Options(
 		smssender.New,
 		networknodes.New,
 		personaldatanodes.New,
+		networkwardens.New,
 		idgenerators.NewHolderSessionsIDGenerator,
 		idgenerators.NewHoldersIDGenerator,
 		idgenerators.NewNetworkNodesIDGenerator,
 		idgenerators.NewPersonalDataNodesIDGenerator,
+		idgenerators.NewNetworkWardensIDGenerator,
 		idgenerators.NewSentEmailsIDGenerator,
 		pgseeds.New,
 	),
