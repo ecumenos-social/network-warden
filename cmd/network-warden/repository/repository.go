@@ -715,3 +715,144 @@ func (r *Repository) GetPersonalDataNodeByAPIKeyHash(ctx context.Context, apiKey
 
 	return nil, err
 }
+
+func (r *Repository) InsertNetworkWarden(ctx context.Context, nw *models.NetworkWarden) error {
+	query := `insert into public.network_wardens
+  (id, created_at, last_modified_at, label, address, name, description, location,
+   pdn_capacity, nn_capacity, alive, last_pinged_at, is_open, url, version,
+   rate_limit_max_requests, rate_limit_interval, id_gen_node)
+  values ($1, $2, $3, $4, $5, $6, $7, ST_SetSRID(ST_MakePoint($8, $9), 4326), $10, $11, $12, $13, $14, $15, $16, $17, $18, $19);`
+	params := []interface{}{
+		nw.ID, nw.CreatedAt, nw.LastModifiedAt, nw.Label, nw.Address, nw.Name, nw.Description, nw.Location.Longitude, nw.Location.Latitude,
+		nw.PDNCapacity, nw.NNCapacity, nw.Alive, nw.LastPingedAt, nw.IsOpen, nw.URL, nw.Version,
+		nw.RateLimitMaxRequests, nw.RateLimitInterval, nw.IDGenNode,
+	}
+	err := r.driver.ExecuteQuery(ctx, query, params...)
+	return err
+}
+
+func (r *Repository) scanNetworkWarden(rows scanner) (*models.NetworkWarden, error) {
+	var (
+		nw       models.NetworkWarden
+		location models.Location
+	)
+	err := rows.Scan(
+		&nw.ID,
+		&nw.CreatedAt,
+		&nw.LastModifiedAt,
+		&nw.Label,
+		&nw.Address,
+		&nw.Name,
+		&nw.Description,
+		&location.Longitude,
+		&location.Latitude,
+		&nw.PDNCapacity,
+		&nw.NNCapacity,
+		&nw.Alive,
+		&nw.LastPingedAt,
+		&nw.IsOpen,
+		&nw.URL,
+		&nw.Version,
+		&nw.RateLimitMaxRequests,
+		&nw.RateLimitInterval,
+		&nw.IDGenNode,
+	)
+	if err != nil {
+		return nil, err
+	}
+	nw.Location = &location
+
+	return &nw, nil
+}
+
+func (r *Repository) GetNetworkWardensList(ctx context.Context, filters map[string]interface{}, pagination *types.Pagination) ([]*models.NetworkWarden, error) {
+	var (
+		whereStatements = make([]string, 0, len(filters))
+		args            = make([]interface{}, 0, len(filters)+2)
+	)
+	args = append(args, pagination.GetLimit(), pagination.GetOffset())
+
+	for field, value := range filters {
+		args = append(args, value)
+		whereStatements = append(whereStatements, field+"=$"+fmt.Sprint(len(args)))
+	}
+	var whereStatement string
+	if len(whereStatements) > 0 {
+		whereStatement = "where " + strings.Join(whereStatements, ", ")
+	}
+
+	q := fmt.Sprintf(`
+  select
+    id, created_at, last_modified_at, label, address, name, description, ST_X(location::geometry), ST_Y(location::geometry),
+    pdn_capacity, nn_capacity, alive, last_pinged_at, is_open, url, version,
+    rate_limit_max_requests, rate_limit_interval, status, id_gen_node
+  from public.network_wardens %s limit $1 offset $2;`, whereStatement)
+	rows, err := r.driver.QueryRows(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	var out []*models.NetworkWarden
+
+	for rows.Next() {
+		nw, err := r.scanNetworkWarden(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, nw)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func (r *Repository) GetNetworkWardenByLabel(ctx context.Context, label string) (*models.NetworkWarden, error) {
+	q := `
+  select
+    id, created_at, last_modified_at, label, address, name, description, ST_X(location::geometry), ST_Y(location::geometry),
+    pdn_capacity, nn_capacity, alive, last_pinged_at, is_open, url, version,
+    rate_limit_max_requests, rate_limit_interval, id_gen_node
+  from public.network_wardens
+  where label=$1;`
+	row, err := r.driver.QueryRow(ctx, q, label)
+	if err != nil {
+		return nil, err
+	}
+
+	nw, err := r.scanNetworkWarden(row)
+	if err == nil {
+		return nw, nil
+	}
+
+	if primitives.IsSameError(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+
+	return nil, err
+}
+
+func (r *Repository) GetNetworkWardenByID(ctx context.Context, id int64) (*models.NetworkWarden, error) {
+	q := `
+  select
+    id, created_at, last_modified_at, label, address, name, description, ST_X(location::geometry), ST_Y(location::geometry),
+    pdn_capacity, nn_capacity, alive, last_pinged_at, is_open, url, version,
+    rate_limit_max_requests, rate_limit_interval, id_gen_node
+  from public.network_wardens
+  where id=$1;`
+	row, err := r.driver.QueryRow(ctx, q, id)
+	if err != nil {
+		return nil, err
+	}
+
+	nw, err := r.scanNetworkWarden(row)
+	if err == nil {
+		return nw, nil
+	}
+
+	if primitives.IsSameError(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+
+	return nil, err
+}

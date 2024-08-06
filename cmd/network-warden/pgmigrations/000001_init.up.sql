@@ -121,15 +121,11 @@ create table public.network_wardens
   version                       text not null,
   rate_limit_max_requests       bigint not null,
   rate_limit_interval           bigint not null,
-  crawl_rate_limit_max_requests bigint not null,
-  crawl_rate_limit_interval     bigint not null,
-  status                        text not null,
   id_gen_node                   bigint not null
 );
 
 create unique index network_wardens_label_uindex on network_wardens (label);
 create unique index network_wardens_address_uindex on network_wardens (address);
-create index network_wardens_status_index on network_wardens (status);
 
 commit;
 
