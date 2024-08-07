@@ -818,9 +818,12 @@ func (h *Handler) RegisterNetworkWarden(ctx context.Context, req *pbv1.NetworkWa
 	params := &networkwardens.InsertParams{
 		Name:        req.Name,
 		Description: req.Description,
-		Label:       req.AddressSuffix,
-		Location:    &models.Location{},
-		IsOpen:      true,
+		Label:       req.Label,
+		Location: &models.Location{
+			Longitude: req.Location.Longitude,
+			Latitude:  req.Location.Latitude,
+		},
+		IsOpen:      req.IsOpen,
 		Version:     req.Version,
 		URL:         req.Url,
 		PDNCapacity: int64(req.PdnCapacity),
@@ -829,7 +832,7 @@ func (h *Handler) RegisterNetworkWarden(ctx context.Context, req *pbv1.NetworkWa
 			MaxRequests: req.RateLimit.MaxRequests,
 			Interval:    req.RateLimit.Interval.AsDuration(),
 		},
-		IDGenNode: -1,
+		IDGenNode: req.IdGenNode,
 	}
 	if _, err := h.networkWardensService.Insert(ctx, logger, params); err != nil {
 		logger.Error("failed to register", zap.Error(err), zap.Any("request-body", req))
