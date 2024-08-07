@@ -60,3 +60,10 @@ run-nw-purge-seed: run-nw-migrate-down run-nw-migrate-up run-nw-seed
 .PHONY: run-admin
 run-admin: .env
 	go run cmd/admin/*.go run
+
+.PHONY: run-admin-seed
+run-admin-seed: .env
+	go run cmd/admin/*.go seed
+
+.PHONY: run-admin-purge-seed
+run-admin-purge-seed: run-nw-migrate-down run-nw-migrate-up run-admin-seed

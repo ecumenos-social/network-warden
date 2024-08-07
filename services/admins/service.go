@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ecumenos-social/network-warden/models"
+	"github.com/ecumenos-social/toolkit/hash"
 )
 
 type Repository interface {
@@ -26,4 +27,8 @@ func New(repo Repository) Service {
 	return &service{
 		repo: repo,
 	}
+}
+
+func HashPassword(password string) (string, error) {
+	return hash.Hash(password)
 }

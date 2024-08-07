@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/ecumenos-social/network-warden/cmd/admin/configurations"
 	"github.com/ecumenos-social/network-warden/cmd/admin/grpc"
+	"github.com/ecumenos-social/network-warden/cmd/admin/pgseeds"
 	"github.com/ecumenos-social/network-warden/cmd/admin/repository"
 	"github.com/ecumenos-social/network-warden/pkg/fxpostgres"
 	"github.com/ecumenos-social/network-warden/services/admins"
@@ -23,6 +24,7 @@ var Dependencies = fx.Options(
 		grpc.NewGatewayHandler,
 		grpc.NewLivenessGateway,
 		admins.New,
+		pgseeds.New,
 	),
 )
 

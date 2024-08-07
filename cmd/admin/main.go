@@ -29,6 +29,7 @@ func run(args []string) error {
 		Flags:   []cli.Flag{},
 		Commands: []*cli.Command{
 			runAppCmd,
+			runSeedCmd,
 		},
 	}
 

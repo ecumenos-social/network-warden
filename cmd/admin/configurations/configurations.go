@@ -47,7 +47,7 @@ var Module = func(cctx *cli.Context) fx.Option {
 				},
 				Postgres: &fxpostgres.Config{
 					URL:            cctx.String("nw-admin-postgres-url"),
-					MigrationsPath: cctx.String("nw-admin-postgres-migrations-path"),
+					MigrationsPath: cctx.String("nw-postgres-migrations-path"),
 				},
 			}
 		}),

@@ -85,4 +85,10 @@ var Flags = []cli.Flag{
 		Value:   true,
 		EnvVars: []string{"NETWORK_WARDEN_ADMIN_GRPC_KEEP_ALIVE_ENFORCEMENT_PERMIT_WITHOUT_STREAM"},
 	},
+	&cli.StringFlag{
+		Name:    "nw-admin-postgres-url",
+		Usage:   "it is URL of postgres database connected to the app",
+		Value:   `postgresql://ecumenosuser:rootpassword@localhost:5432/ecumenos_network_warden_db`,
+		EnvVars: []string{"NETWORK_WARDEN_ADMIN_POSTGRES_URL"},
+	},
 }
