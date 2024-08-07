@@ -1,0 +1,15 @@
+[
+  {
+    "id": 100,
+    "created_at": "2024-06-14T00:00:00Z",
+    "last_modified_at": "2024-06-14T00:00:00Z",
+    "emails": ["example@mail.com"],
+    "phone_numbers": [],
+    "avatar_image_url": "https://upload.wikimedia.org/wikipedia/commons/d/d4/World_Flag_%282004%29.svg",
+    "countries": ["UKR"],
+    "languages": ["UKR"],
+    "password": "Password12345",
+    "confirmed": true,
+    "confirmation_code": "1111111111"
+  }
+]

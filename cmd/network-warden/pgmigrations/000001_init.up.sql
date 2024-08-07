@@ -2,6 +2,34 @@ begin;
 
 create extension if not exists postgis;
 
+create table public.admins
+(
+  id                bigint primary key,
+  created_at        timestamp(0) with time zone default current_timestamp not null,
+  last_modified_at  timestamp(0) with time zone default current_timestamp not null,
+  emails            text array,
+  phone_numbers     text array ,
+  avatar_image_url  text,
+  countries         text array,
+  languages         text array,
+  password_hash     text not null
+);
+create unique index admins_emails_uindex on admins (emails);
+create unique index admins_phone_numbers_uindex on admins (phone_numbers);
+
+create table public.admin_sessions
+(
+  id                 bigint primary key,
+  created_at         timestamp(0) with time zone default current_timestamp not null,
+  last_modified_at   timestamp(0) with time zone default current_timestamp not null,
+  admin_id           bigint references admins (id) on delete cascade not null,
+  token              text not null,
+  refresh_token      text not null,
+  expired_at         timestamp(0) with time zone,
+  remote_ip_address  text,
+  remote_mac_address text
+);
+
 create table public.holders
 (
   id                bigint primary key,
