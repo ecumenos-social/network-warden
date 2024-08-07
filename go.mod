@@ -6,7 +6,7 @@ require (
 	github.com/ecumenos-social/error-wrapper v0.0.1
 	github.com/ecumenos-social/grpc-utils v0.0.1
 	github.com/ecumenos-social/id-generator v0.0.3
-	github.com/ecumenos-social/schemas v0.0.20
+	github.com/ecumenos-social/schemas v0.0.21
 	github.com/ecumenos-social/toolkit v0.0.4
 	github.com/ecumenos-social/toolkitfx v0.1.0
 	github.com/golang-migrate/migrate/v4 v4.17.1
