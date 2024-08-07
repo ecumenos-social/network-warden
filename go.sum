@@ -41,8 +41,8 @@ github.com/ecumenos-social/grpc-utils v0.0.1 h1:tH7X8sW7+tfjM2bOUjIYmzFnuX2eNA0/
 github.com/ecumenos-social/grpc-utils v0.0.1/go.mod h1:os4xHtcifDCUwxQT5wbWGi2tCwjDAT79zFQHZZ3dz6M=
 github.com/ecumenos-social/id-generator v0.0.3 h1:hNh0mOLAoSAWbc6taEBSY5701l4uUkutj/1bEvuJlJU=
 github.com/ecumenos-social/id-generator v0.0.3/go.mod h1:wCWZYOTJbdjqSQiWPdLRCrIQudqDBBn5/CXTnw5UPfA=
-github.com/ecumenos-social/schemas v0.0.19 h1:W3uxwRHk8UITWin3hwABifPq4KUi6d838Es4pxL7pgo=
-github.com/ecumenos-social/schemas v0.0.19/go.mod h1:yhQTZ0KM0vo3I9ozfsC19du6lg9kkRJPU6X+Uc0dj3o=
+github.com/ecumenos-social/schemas v0.0.20 h1:r1fm6kYzjwt9TBQmNjzZqkRdMcKqP5Lbvj4akaPuq0E=
+github.com/ecumenos-social/schemas v0.0.20/go.mod h1:yhQTZ0KM0vo3I9ozfsC19du6lg9kkRJPU6X+Uc0dj3o=
 github.com/ecumenos-social/toolkit v0.0.4 h1:9/DY7Ij4+/97zuzvWFANrn8XRasWaKXmN3cYbHz7otM=
 github.com/ecumenos-social/toolkit v0.0.4/go.mod h1:om/rsggY8Phf3rsY1eKVydVDUuTdsDZwdN5ji7b3JgA=
 github.com/ecumenos-social/toolkitfx v0.1.0 h1:e5sTJ2Myw0A2K6QU5RqQsM0VDtirZm3+hrvoWCotwxM=
