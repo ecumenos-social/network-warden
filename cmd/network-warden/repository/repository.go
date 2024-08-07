@@ -785,7 +785,7 @@ func (r *Repository) GetNetworkWardensList(ctx context.Context, filters map[stri
   select
     id, created_at, last_modified_at, label, address, name, description, ST_X(location::geometry), ST_Y(location::geometry),
     pdn_capacity, nn_capacity, alive, last_pinged_at, is_open, url, version,
-    rate_limit_max_requests, rate_limit_interval, status, id_gen_node
+    rate_limit_max_requests, rate_limit_interval, id_gen_node
   from public.network_wardens %s limit $1 offset $2;`, whereStatement)
 	rows, err := r.driver.QueryRows(ctx, q, args...)
 	if err != nil {

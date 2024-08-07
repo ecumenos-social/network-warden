@@ -23,6 +23,7 @@ type Repository interface {
 
 type Service interface {
 	Insert(ctx context.Context, logger *zap.Logger, params *InsertParams) (*models.NetworkWarden, error)
+	GetList(ctx context.Context, logger *zap.Logger, pagination *types.Pagination) ([]*models.NetworkWarden, error)
 }
 
 type service struct {
@@ -105,4 +106,8 @@ func (s *service) Insert(ctx context.Context, logger *zap.Logger, params *Insert
 	}
 
 	return nw, nil
+}
+
+func (s *service) GetList(ctx context.Context, logger *zap.Logger, pagination *types.Pagination) ([]*models.NetworkWarden, error) {
+	return s.repo.GetNetworkWardensList(ctx, map[string]interface{}{}, pagination)
 }

@@ -122,6 +122,33 @@ func convertPersonalDataNodeToProtoPersonalDataNode(pdn *models.PersonalDataNode
 	}
 }
 
+func convertNetworkWardenToProtoNetworkWarden(nw *models.NetworkWarden) *pbv1.NetworkWarden {
+	var lastPingedAt *string
+	if nw.LastPingedAt.Valid {
+		lastPingedAt = lo.ToPtr(formats.FormatDateTime(nw.LastPingedAt.Time))
+	}
+
+	return &pbv1.NetworkWarden{
+		Id:             fmt.Sprint(nw.ID),
+		CreatedAt:      formats.FormatDateTime(nw.CreatedAt),
+		LastModifiedAt: formats.FormatDateTime(nw.LastModifiedAt),
+		IdGenNode:      nw.IDGenNode,
+		Name:           nw.Name,
+		Description:    nw.Description,
+		Label:          nw.Label,
+		Address:        nw.Address,
+		PdnCapacity:    uint64(nw.PDNCapacity),
+		NnCapacity:     uint64(nw.NNCapacity),
+		Location:       convertLocationToProtoLocation(nw.Location),
+		IsOpen:         nw.IsOpen,
+		Url:            nw.URL,
+		Alive:          nw.Alive,
+		LastPingedAt:   lastPingedAt,
+		Version:        nw.Version,
+		RateLimit:      convertRateLimitToProtoRateLimit(&types.RateLimit{MaxRequests: nw.RateLimitMaxRequests, Interval: nw.RateLimitInterval}),
+	}
+}
+
 func convertLocationToProtoLocation(l *models.Location) *v1.Geolocation {
 	if l == nil {
 		return nil

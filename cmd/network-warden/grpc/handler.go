@@ -701,6 +701,7 @@ func (h *Handler) GetNetworkNodesList(ctx context.Context, req *pbv1.NetworkWard
 		req.OnlyMy != nil && *req.OnlyMy,
 	)
 	if err != nil {
+		logger.Error("failed to get list", zap.Error(err))
 		return nil, status.Error(codes.Internal, "failed to get network nodes list")
 	}
 	data := make([]*pbv1.NetworkNode, 0, len(nns))
@@ -808,7 +809,23 @@ func (h *Handler) GetNetworkWardensList(ctx context.Context, req *pbv1.NetworkWa
 	logger := h.customizeLogger(ctx, "GetNetworkWardensList")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	nws, err := h.networkWardensService.GetList(
+		ctx,
+		logger,
+		convertProtoPaginationToPagination(req.Pagination),
+	)
+	if err != nil {
+		logger.Error("failed to get list", zap.Error(err))
+		return nil, status.Error(codes.Internal, "failed to get network wardens list")
+	}
+	data := make([]*pbv1.NetworkWarden, 0, len(nws))
+	for _, nw := range nws {
+		data = append(data, convertNetworkWardenToProtoNetworkWarden(nw))
+	}
+
+	return &pbv1.NetworkWardenServiceGetNetworkWardensListResponse{
+		Data: data,
+	}, nil
 }
 
 func (h *Handler) RegisterNetworkWarden(ctx context.Context, req *pbv1.NetworkWardenServiceRegisterNetworkWardenRequest) (*pbv1.NetworkWardenServiceRegisterNetworkWardenResponse, error) {
