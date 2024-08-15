@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/ecumenos-social/network-warden/models"
-	"github.com/ecumenos-social/network-warden/pkg/fxpostgres"
 	"github.com/ecumenos-social/toolkit/primitives"
+	"github.com/ecumenos-social/toolkitfx/fxpostgres"
 	"github.com/jackc/pgx/v4"
 )
 

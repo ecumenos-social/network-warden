@@ -11,8 +11,8 @@ import (
 
 	errorwrapper "github.com/ecumenos-social/error-wrapper"
 	"github.com/ecumenos-social/network-warden/models"
-	"github.com/ecumenos-social/network-warden/pkg/sliceutils"
 	"github.com/ecumenos-social/network-warden/services/idgenerators"
+	"github.com/ecumenos-social/toolkit/slices"
 	"go.uber.org/zap"
 )
 
@@ -109,7 +109,7 @@ func (s *service) sendTemplate(ctx context.Context, logger *zap.Logger, name Tem
 	}
 	logger.Info("email was sent successfully")
 
-	for _, receiverEmail := range sliceutils.Merge(to, cc) {
+	for _, receiverEmail := range slices.Merge(to, cc) {
 		m := &models.SentEmail{
 			ID:             s.idgenerator.Generate().Int64(),
 			CreatedAt:      time.Now(),
@@ -132,7 +132,7 @@ func (s *service) CanSendConfirmationOfRegistration(ctx context.Context, logger 
 }
 
 func (s *service) canSendTemplate(ctx context.Context, logger *zap.Logger, name TemplateName, to, cc []string, rl *RateLimit) (bool, error) {
-	receivers := sliceutils.Merge(to, cc)
+	receivers := slices.Merge(to, cc)
 	ses := make([]*models.SentEmail, 0, len(receivers))
 	for _, r := range receivers {
 		sentEmails, err := s.repo.GetSentEmails(ctx, s.senderEmailAddress, r, name.String())
@@ -149,7 +149,7 @@ func (s *service) canSendTemplate(ctx context.Context, logger *zap.Logger, name 
 func (s *service) formMessage(name TemplateName, from string, to, cc []string, data interface{}) ([]byte, error) {
 	var buf bytes.Buffer
 	buf.WriteString(fmt.Sprintf("From: %s\r\n", from))
-	buf.WriteString(fmt.Sprintf("To: %s\r\n", strings.Join(sliceutils.Merge(to, cc), ",")))
+	buf.WriteString(fmt.Sprintf("To: %s\r\n", strings.Join(slices.Merge(to, cc), ",")))
 	if len(cc) > 0 {
 		buf.WriteString(fmt.Sprintf("Cc: %s\r\n", strings.Join(cc, ",")))
 	}

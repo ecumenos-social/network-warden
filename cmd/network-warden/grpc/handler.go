@@ -7,8 +7,8 @@ import (
 	"strconv"
 
 	errorwrapper "github.com/ecumenos-social/error-wrapper"
+	grpcutils "github.com/ecumenos-social/grpc-utils"
 	"github.com/ecumenos-social/network-warden/models"
-	"github.com/ecumenos-social/network-warden/pkg/grpcutils"
 	"github.com/ecumenos-social/network-warden/services/auth"
 	"github.com/ecumenos-social/network-warden/services/emailer"
 	"github.com/ecumenos-social/network-warden/services/holders"

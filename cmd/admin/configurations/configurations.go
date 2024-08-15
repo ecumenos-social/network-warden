@@ -1,9 +1,9 @@
 package configurations
 
 import (
-	"github.com/ecumenos-social/network-warden/pkg/fxpostgres"
 	"github.com/ecumenos-social/toolkitfx/fxgrpc"
 	"github.com/ecumenos-social/toolkitfx/fxlogger"
+	"github.com/ecumenos-social/toolkitfx/fxpostgres"
 	cli "github.com/urfave/cli/v2"
 	"go.uber.org/fx"
 )

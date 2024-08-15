@@ -5,11 +5,11 @@ import (
 	"github.com/ecumenos-social/network-warden/cmd/admin/grpc"
 	"github.com/ecumenos-social/network-warden/cmd/admin/pgseeds"
 	"github.com/ecumenos-social/network-warden/cmd/admin/repository"
-	"github.com/ecumenos-social/network-warden/pkg/fxpostgres"
 	"github.com/ecumenos-social/network-warden/services/admins"
 	"github.com/ecumenos-social/toolkitfx"
 	"github.com/ecumenos-social/toolkitfx/fxgrpc"
 	"github.com/ecumenos-social/toolkitfx/fxlogger"
+	"github.com/ecumenos-social/toolkitfx/fxpostgres"
 	"go.uber.org/fx"
 )
 

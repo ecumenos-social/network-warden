@@ -3,7 +3,7 @@ package grpc
 import (
 	"context"
 
-	"github.com/ecumenos-social/network-warden/pkg/grpcutils"
+	grpcutils "github.com/ecumenos-social/grpc-utils"
 	pbv1 "github.com/ecumenos-social/schemas/proto/gen/networkwarden/v1"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
