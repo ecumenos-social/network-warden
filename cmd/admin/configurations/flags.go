@@ -85,4 +85,34 @@ var Flags = []cli.Flag{
 		Value:   true,
 		EnvVars: []string{"NETWORK_WARDEN_ADMIN_GRPC_KEEP_ALIVE_ENFORCEMENT_PERMIT_WITHOUT_STREAM"},
 	},
+	&cli.StringFlag{
+		Name:    "nw-admin-postgres-url",
+		Usage:   "it is URL of postgres database connected to the app",
+		Value:   `postgresql://ecumenosuser:rootpassword@localhost:5432/ecumenos_network_warden_db`,
+		EnvVars: []string{"NETWORK_WARDEN_ADMIN_POSTGRES_URL"},
+	},
+	&cli.StringFlag{
+		Name:    "nw-jwt-signing-key",
+		Usage:   "it is JWT secret",
+		Value:   "alDFsk1d2!j@G$4%5^B&f*6(7)h_-g+=",
+		EnvVars: []string{"NETWORK_WARDEN_ADMIN_JWT_SIGNING_KEY"},
+	},
+	&cli.DurationFlag{
+		Name:    "nw-jwt-token-age",
+		Usage:   "it is age of token",
+		Value:   30 * time.Minute,
+		EnvVars: []string{"NETWORK_WARDEN_ADMIN_JWT_TOKEN_AGE"},
+	},
+	&cli.DurationFlag{
+		Name:    "nw-jwt-refresh-token-age",
+		Usage:   "it is age of refresh token",
+		Value:   90 * time.Minute,
+		EnvVars: []string{"NETWORK_WARDEN_ADMIN_JWT_REFRESH_TOKEN_AGE"},
+	},
+	&cli.DurationFlag{
+		Name:    "nw-auth-session-age",
+		Usage:   "it is age of holder session",
+		Value:   90 * time.Minute,
+		EnvVars: []string{"NETWORK_WARDEN_ADMIN_AUTH_SESSION_AGE"},
+	},
 }

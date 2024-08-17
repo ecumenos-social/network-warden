@@ -8,4 +8,7 @@ drop table if exists network_nodes cascade;
 drop table if exists personal_data_nodes cascade;
 drop table if exists network_wardens cascade;
 
+drop table if exists admin_sessions;
+drop table if exists admins;
+
 commit;

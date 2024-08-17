@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/ecumenos-social/network-warden/cmd/network-warden/configurations"
 	"github.com/ecumenos-social/network-warden/cmd/network-warden/pgseeds"
-	"github.com/ecumenos-social/network-warden/pkg/fxpostgres"
+	"github.com/ecumenos-social/toolkitfx/fxpostgres"
 	cli "github.com/urfave/cli/v2"
 	"go.uber.org/fx"
 )
