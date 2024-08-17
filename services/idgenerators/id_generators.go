@@ -70,3 +70,25 @@ func NewNetworkWardensIDGenerator(config *NetworkWardensIDGeneratorConfig) (Netw
 		Low: config.LowNodeID,
 	})
 }
+
+type AdminsIDGeneratorConfig fxidgenerator.Config
+
+type AdminsIDGenerator idgenerator.Generator
+
+func NewAdminsIDGenerator(config *AdminsIDGeneratorConfig) (AdminsIDGenerator, error) {
+	return idgenerator.New(&idgenerator.NodeID{
+		Top: config.TopNodeID,
+		Low: config.LowNodeID,
+	})
+}
+
+type AdminSessionsIDGeneratorConfig fxidgenerator.Config
+
+type AdminSessionsIDGenerator idgenerator.Generator
+
+func NewAdminSessionsIDGenerator(config *AdminSessionsIDGeneratorConfig) (AdminSessionsIDGenerator, error) {
+	return idgenerator.New(&idgenerator.NodeID{
+		Top: config.TopNodeID,
+		Low: config.LowNodeID,
+	})
+}

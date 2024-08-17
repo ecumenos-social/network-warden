@@ -177,3 +177,91 @@ func (r *Repository) InsertAdmin(ctx context.Context, holder *models.Admin) erro
 	err := r.driver.ExecuteQuery(ctx, query, params...)
 	return err
 }
+
+func (r *Repository) InsertAdminSession(ctx context.Context, adminSession *models.AdminSession) error {
+	query := `insert into public.admin_sessions
+  (id, created_at, last_modified_at, admin_id, token, refresh_token, expired_at, remote_ip_address, remote_mac_address)
+  values ($1, $2, $3, $4, $5, $6, $7, $8, $9);`
+	params := []interface{}{
+		adminSession.ID, adminSession.CreatedAt, adminSession.LastModifiedAt,
+		adminSession.AdminID, adminSession.Token, adminSession.RefreshToken, adminSession.ExpiredAt,
+		adminSession.RemoteIPAddress, adminSession.RemoteMACAddress,
+	}
+	err := r.driver.ExecuteQuery(ctx, query, params...)
+	return err
+}
+
+func (r *Repository) scanAdminSession(rows scanner) (*models.AdminSession, error) {
+	var hs models.AdminSession
+	err := rows.Scan(
+		&hs.ID,
+		&hs.CreatedAt,
+		&hs.LastModifiedAt,
+		&hs.AdminID,
+		&hs.Token,
+		&hs.RefreshToken,
+		&hs.ExpiredAt,
+		&hs.RemoteIPAddress,
+		&hs.RemoteMACAddress,
+	)
+	return &hs, err
+}
+
+func (r *Repository) GetAdminSessionByRefreshToken(ctx context.Context, refToken string) (*models.AdminSession, error) {
+	q := `
+  select
+  id, created_at, last_modified_at, admin_id, token, refresh_token, expired_at, remote_ip_address, remote_mac_address
+  from public.admin_sessions
+  where refresh_token=$1;`
+	row, err := r.driver.QueryRow(ctx, q, refToken)
+	if err != nil {
+		return nil, err
+	}
+
+	hs, err := r.scanAdminSession(row)
+	if err == nil {
+		return hs, nil
+	}
+
+	if primitives.IsSameError(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+
+	return nil, err
+}
+
+func (r *Repository) GetAdminSessionByToken(ctx context.Context, token string) (*models.AdminSession, error) {
+	q := `
+  select
+  id, created_at, last_modified_at, admin_id, token, refresh_token, expired_at, remote_ip_address, remote_mac_address
+  from public.admin_sessions
+  where token=$1;`
+	row, err := r.driver.QueryRow(ctx, q, token)
+	if err != nil {
+		return nil, err
+	}
+
+	hs, err := r.scanAdminSession(row)
+	if err == nil {
+		return hs, nil
+	}
+
+	if primitives.IsSameError(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+
+	return nil, err
+}
+
+func (r *Repository) ModifyAdminSession(ctx context.Context, id int64, adminSession *models.AdminSession) error {
+	query := `update public.admin_sessions
+  set created_at=$2, last_modified_at=$3, admin_id=$4, token=$5, refresh_token=$6, expired_at=$7, remote_ip_address=$8, remote_mac_address=$9
+  where id=$1;`
+	params := []interface{}{
+		adminSession.ID, adminSession.CreatedAt, adminSession.LastModifiedAt,
+		adminSession.AdminID, adminSession.Token, adminSession.RefreshToken, adminSession.ExpiredAt,
+		adminSession.RemoteIPAddress, adminSession.RemoteMACAddress,
+	}
+	err := r.driver.ExecuteQuery(ctx, query, params...)
+	return err
+}

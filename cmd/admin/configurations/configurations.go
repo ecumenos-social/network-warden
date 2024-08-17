@@ -1,6 +1,9 @@
 package configurations
 
 import (
+	"github.com/ecumenos-social/network-warden/services/adminauth"
+	"github.com/ecumenos-social/network-warden/services/idgenerators"
+	"github.com/ecumenos-social/network-warden/services/jwt"
 	"github.com/ecumenos-social/toolkitfx/fxgrpc"
 	"github.com/ecumenos-social/toolkitfx/fxlogger"
 	"github.com/ecumenos-social/toolkitfx/fxpostgres"
@@ -11,9 +14,13 @@ import (
 type fxConfig struct {
 	fx.Out
 
-	Logger   *fxlogger.Config
-	GRPC     *fxgrpc.Config
-	Postgres *fxpostgres.Config
+	Logger                   *fxlogger.Config
+	GRPC                     *fxgrpc.Config
+	Postgres                 *fxpostgres.Config
+	AdminSessionsIDGenerator *idgenerators.AdminSessionsIDGeneratorConfig
+	AdminsIDGenerator        *idgenerators.AdminsIDGeneratorConfig
+	JWT                      *jwt.Config
+	Auth                     *adminauth.Config
 }
 
 var Module = func(cctx *cli.Context) fx.Option {
@@ -48,6 +55,22 @@ var Module = func(cctx *cli.Context) fx.Option {
 				Postgres: &fxpostgres.Config{
 					URL:            cctx.String("nw-admin-postgres-url"),
 					MigrationsPath: cctx.String("nw-postgres-migrations-path"),
+				},
+				AdminSessionsIDGenerator: &idgenerators.AdminSessionsIDGeneratorConfig{
+					TopNodeID: cctx.Int64("nw-app-id-gen-node"),
+					LowNodeID: 0,
+				},
+				AdminsIDGenerator: &idgenerators.AdminsIDGeneratorConfig{
+					TopNodeID: cctx.Int64("nw-app-id-gen-node"),
+					LowNodeID: 0,
+				},
+				JWT: &jwt.Config{
+					SigningKey:      cctx.String("nw-jwt-signing-key"),
+					TokenAge:        cctx.Duration("nw-jwt-token-age"),
+					RefreshTokenAge: cctx.Duration("nw-jwt-refresh-token-age"),
+				},
+				Auth: &adminauth.Config{
+					SessionAge: cctx.Duration("nw-auth-session-age"),
 				},
 			}
 		}),

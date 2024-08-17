@@ -2,9 +2,15 @@ package grpc
 
 import (
 	"context"
+	"fmt"
 
 	grpcutils "github.com/ecumenos-social/grpc-utils"
+	"github.com/ecumenos-social/network-warden/services/adminauth"
+	"github.com/ecumenos-social/network-warden/services/admins"
+	"github.com/ecumenos-social/network-warden/services/jwt"
 	pbv1 "github.com/ecumenos-social/schemas/proto/gen/networkwarden/v1"
+	"github.com/samber/lo"
+	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -14,14 +20,30 @@ import (
 type Handler struct {
 	pbv1.AdminServiceServer
 
+	jwt    jwt.Service
+	admins admins.Service
+	auth   adminauth.Service
 	logger *zap.Logger
 }
 
 var _ pbv1.AdminServiceServer = (*Handler)(nil)
 
-func NewHandler(logger *zap.Logger) *Handler {
+type handlerParams struct {
+	fx.In
+
+	AdminsService        admins.Service
+	AdminSessionsService adminauth.Service
+	AuthService          jwt.Service
+	Logger               *zap.Logger
+}
+
+func NewHandler(params handlerParams) *Handler {
 	return &Handler{
-		logger: logger,
+		jwt:    params.AuthService,
+		admins: params.AdminsService,
+		auth:   params.AdminSessionsService,
+
+		logger: params.Logger,
 	}
 }
 
@@ -44,11 +66,51 @@ func (h *Handler) customizeLogger(ctx context.Context, operationName string) *za
 	return l
 }
 
-func (h *Handler) LoginAdmin(ctx context.Context, _ *pbv1.AdminServiceLoginAdminRequest) (*pbv1.AdminServiceLoginAdminResponse, error) {
+func (h *Handler) createSession(ctx context.Context, logger *zap.Logger, adminID int64, ip string, mac *string) (string, string, error) {
+	token, refreshToken, err := h.jwt.CreateTokens(ctx, logger, fmt.Sprint(adminID))
+	if err != nil {
+		return "", "", status.Errorf(codes.Internal, "failed create tokens (error = %v)", err.Error())
+	}
+
+	_, err = h.auth.Insert(ctx, logger, &adminauth.InsertParams{
+		AdminID:          adminID,
+		Token:            token,
+		RefreshToken:     refreshToken,
+		RemoteIPAddress:  ip,
+		RemoteMACAddress: mac,
+	})
+	if err != nil {
+		return "", "", status.Errorf(codes.Internal, "failed create session (error = %v)", err.Error())
+	}
+
+	return token, refreshToken, nil
+}
+
+func (h *Handler) LoginAdmin(ctx context.Context, req *pbv1.AdminServiceLoginAdminRequest) (*pbv1.AdminServiceLoginAdminResponse, error) {
 	logger := h.customizeLogger(ctx, "LoginAdmin")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	admin, err := h.admins.GetHolderByEmailOrPhoneNumber(ctx, logger, req.Email, req.PhoneNumber)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed get admin, err=%v", err.Error())
+	}
+	if admin == nil {
+		return nil, status.Error(codes.InvalidArgument, "admin not found")
+	}
+	logger = logger.With(zap.Int64("admin-id", admin.ID))
+
+	if err := h.admins.ValidatePassword(ctx, logger, admin, req.Password); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid password")
+	}
+	token, refreshToken, err := h.createSession(ctx, logger, admin.ID, grpcutils.ExtractRemoteIPAddress(ctx), lo.ToPtr(req.RemoteMacAddress))
+	if err != nil {
+		return nil, err
+	}
+
+	return &pbv1.AdminServiceLoginAdminResponse{
+		Token:        token,
+		RefreshToken: refreshToken,
+	}, nil
 }
 
 func (h *Handler) RefreshAdminToken(ctx context.Context, _ *pbv1.AdminServiceRefreshAdminTokenRequest) (*pbv1.AdminServiceRefreshAdminTokenResponse, error) {
