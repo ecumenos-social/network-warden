@@ -655,9 +655,10 @@ func (h *Handler) InitiatePersonalDataNode(ctx context.Context, req *pbv1.Networ
 	defer logger.Info("request processed")
 
 	params := &personaldatanodes.InitiateParams{
-		AccountsCapacity: req.AccountsCapacity,
-		IsOpen:           req.IsOpen,
-		Version:          req.Version,
+		AccountsCapacity:     req.AccountsCapacity,
+		IsOpen:               req.IsOpen,
+		IsInviteCodeRequired: req.IsInviteCodeRequired,
+		Version:              req.Version,
 		RateLimit: &types.RateLimit{
 			MaxRequests: req.RateLimit.MaxRequests,
 			Interval:    req.RateLimit.Interval.AsDuration(),
@@ -784,9 +785,10 @@ func (h *Handler) InitiateNetworkNode(ctx context.Context, req *pbv1.NetworkWard
 	defer logger.Info("request processed")
 
 	params := &networknodes.InitiateParams{
-		AccountsCapacity: req.AccountsCapacity,
-		IsOpen:           req.IsOpen,
-		Version:          req.Version,
+		AccountsCapacity:     req.AccountsCapacity,
+		IsOpen:               req.IsOpen,
+		IsInviteCodeRequired: req.IsInviteCodeRequired,
+		Version:              req.Version,
 		RateLimit: &types.RateLimit{
 			MaxRequests: req.RateLimit.MaxRequests,
 			Interval:    req.RateLimit.Interval.AsDuration(),

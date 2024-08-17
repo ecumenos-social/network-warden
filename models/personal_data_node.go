@@ -20,6 +20,7 @@ type PersonalDataNode struct {
 	Alive                     bool                   `json:"alive"`
 	LastPingedAt              sql.NullTime           `json:"last_pinged_at"`
 	IsOpen                    bool                   `json:"is_open"`
+	IsInviteCodeRequired      bool                   `json:"is_invite_code_required"`
 	URL                       string                 `json:"url"`
 	APIKeyHash                string                 `json:"api_key_hash"`
 	Version                   string                 `json:"version"`

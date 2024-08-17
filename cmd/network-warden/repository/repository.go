@@ -348,12 +348,12 @@ func (r *Repository) GetSentEmails(ctx context.Context, sender, receiver, templa
 func (r *Repository) InsertNetworkNode(ctx context.Context, nn *models.NetworkNode) error {
 	query := `insert into public.network_nodes
   (id, created_at, last_modified_at, network_warden_id, holder_id, name, description, domain_name, location,
-   accounts_capacity, alive, last_pinged_at, is_open, url, api_key_hash, version,
+   accounts_capacity, alive, last_pinged_at, is_open, is_invite_code_required, url, api_key_hash, version,
    rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node)
-  values ($1, $2, $3, $4, $5, $6, $7, $8, ST_SetSRID(ST_MakePoint($9, $10), 4326), $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23);`
+  values ($1, $2, $3, $4, $5, $6, $7, $8, ST_SetSRID(ST_MakePoint($9, $10), 4326), $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24);`
 	params := []interface{}{
 		nn.ID, nn.CreatedAt, nn.LastModifiedAt, nn.NetworkWardenID, nn.HolderID, nn.Name, nn.Description, nn.DomainName, nn.Location.Longitude, nn.Location.Latitude,
-		nn.AccountsCapacity, nn.Alive, nn.LastPingedAt, nn.IsOpen, nn.URL, nn.APIKeyHash, nn.Version,
+		nn.AccountsCapacity, nn.Alive, nn.LastPingedAt, nn.IsOpen, nn.IsInviteCodeRequired, nn.URL, nn.APIKeyHash, nn.Version,
 		nn.RateLimitMaxRequests, nn.RateLimitInterval, nn.CrawlRateLimitMaxRequests, nn.CrawlRateLimitInterval, nn.Status, nn.IDGenNode,
 	}
 	err := r.driver.ExecuteQuery(ctx, query, params...)
@@ -363,12 +363,12 @@ func (r *Repository) InsertNetworkNode(ctx context.Context, nn *models.NetworkNo
 func (r *Repository) ModifyNetworkNode(ctx context.Context, id int64, nn *models.NetworkNode) error {
 	query := `update public.network_nodes
   set created_at=$2, last_modified_at=$3, network_warden_id=$4, holder_id=$5, name=$6, description=$7, domain_name=$8, location=ST_SetSRID(ST_MakePoint($9, $10), 4326),
-  accounts_capacity=$11, alive=$12, last_pinged_at=$13, is_open=$14, url=$15, api_key_hash=$16, version=$17,
-  rate_limit_max_requests=$18, rate_limit_interval=$19, crawl_rate_limit_max_requests=$20, crawl_rate_limit_interval=$21, status=$22, id_gen_node=$23
+  accounts_capacity=$11, alive=$12, last_pinged_at=$13, is_open=$14, is_invite_code_required=$15, url=$16, api_key_hash=$17, version=$18,
+  rate_limit_max_requests=$19, rate_limit_interval=$20, crawl_rate_limit_max_requests=$21, crawl_rate_limit_interval=$22, status=$23, id_gen_node=$24
   where id=$1;`
 	params := []interface{}{
 		nn.ID, nn.CreatedAt, nn.LastModifiedAt, nn.NetworkWardenID, nn.HolderID, nn.Name, nn.Description, nn.DomainName, nn.Location.Longitude, nn.Location.Latitude,
-		nn.AccountsCapacity, nn.Alive, nn.LastPingedAt, nn.IsOpen, nn.URL, nn.APIKeyHash, nn.Version,
+		nn.AccountsCapacity, nn.Alive, nn.LastPingedAt, nn.IsOpen, nn.IsInviteCodeRequired, nn.URL, nn.APIKeyHash, nn.Version,
 		nn.RateLimitMaxRequests, nn.RateLimitInterval, nn.CrawlRateLimitMaxRequests, nn.CrawlRateLimitInterval, nn.Status, nn.IDGenNode,
 	}
 	err := r.driver.ExecuteQuery(ctx, query, params...)
@@ -395,6 +395,7 @@ func (r *Repository) scanNetworkNode(rows scanner) (*models.NetworkNode, error) 
 		&nn.Alive,
 		&nn.LastPingedAt,
 		&nn.IsOpen,
+		&nn.IsInviteCodeRequired,
 		&nn.URL,
 		&nn.APIKeyHash,
 		&nn.Version,
@@ -413,6 +414,10 @@ func (r *Repository) scanNetworkNode(rows scanner) (*models.NetworkNode, error) 
 	return &nn, nil
 }
 
+const selectNetworkNodeStatementFieldsQuery = `id, created_at, last_modified_at, network_warden_id, holder_id, name, description, domain_name, ST_X(location::geometry), ST_Y(location::geometry),
+    accounts_capacity, alive, last_pinged_at, is_open, is_invite_code_required, url, api_key_hash, version,
+    rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node`
+
 func (r *Repository) GetNetworkNodesList(ctx context.Context, filters map[string]interface{}, pagination *types.Pagination) ([]*models.NetworkNode, error) {
 	var (
 		whereStatements = make([]string, 0, len(filters))
@@ -429,12 +434,7 @@ func (r *Repository) GetNetworkNodesList(ctx context.Context, filters map[string
 		whereStatement = "where " + strings.Join(whereStatements, ", ")
 	}
 
-	q := fmt.Sprintf(`
-  select
-    id, created_at, last_modified_at, network_warden_id, holder_id, name, description, domain_name, ST_X(location::geometry), ST_Y(location::geometry),
-    accounts_capacity, alive, last_pinged_at, is_open, url, api_key_hash, version,
-    rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node
-  from public.network_nodes %s limit $1 offset $2;`, whereStatement)
+	q := fmt.Sprintf(`select %s from public.network_nodes %s limit $1 offset $2;`, selectNetworkNodeStatementFieldsQuery, whereStatement)
 	rows, err := r.driver.QueryRows(ctx, q, args...)
 	if err != nil {
 		return nil, err
@@ -456,13 +456,7 @@ func (r *Repository) GetNetworkNodesList(ctx context.Context, filters map[string
 }
 
 func (r *Repository) GetNetworkNodeByDomainName(ctx context.Context, domainName string) (*models.NetworkNode, error) {
-	q := `
-  select
-    id, created_at, last_modified_at, network_warden_id, holder_id, name, description, domain_name, ST_X(location::geometry), ST_Y(location::geometry),
-    accounts_capacity, alive, last_pinged_at, is_open, url, api_key_hash, version,
-    rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node
-  from public.network_nodes
-  where domain_name=$1;`
+	q := fmt.Sprintf(`select %s from public.network_nodes where domain_name=$1;`, selectNetworkNodeStatementFieldsQuery)
 	row, err := r.driver.QueryRow(ctx, q, domainName)
 	if err != nil {
 		return nil, err
@@ -481,13 +475,7 @@ func (r *Repository) GetNetworkNodeByDomainName(ctx context.Context, domainName 
 }
 
 func (r *Repository) GetNetworkNodeByID(ctx context.Context, id int64) (*models.NetworkNode, error) {
-	q := `
-  select
-    id, created_at, last_modified_at, network_warden_id, holder_id, name, description, domain_name, ST_X(location::geometry), ST_Y(location::geometry),
-    accounts_capacity, alive, last_pinged_at, is_open, url, api_key_hash, version,
-    rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node
-  from public.network_nodes
-  where id=$1;`
+	q := fmt.Sprintf(`select %s from public.network_nodes where id=$1;`, selectNetworkNodeStatementFieldsQuery)
 	row, err := r.driver.QueryRow(ctx, q, id)
 	if err != nil {
 		return nil, err
@@ -506,13 +494,7 @@ func (r *Repository) GetNetworkNodeByID(ctx context.Context, id int64) (*models.
 }
 
 func (r *Repository) GetNetworkNodeByAPIKeyHash(ctx context.Context, apiKeyHash string) (*models.NetworkNode, error) {
-	q := `
-  select
-    id, created_at, last_modified_at, network_warden_id, holder_id, name, description, domain_name, ST_X(location::geometry), ST_Y(location::geometry),
-    accounts_capacity, alive, last_pinged_at, is_open, url, api_key_hash, version,
-    rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node
-  from public.network_nodes
-  where api_key_hash=$1;`
+	q := fmt.Sprintf(`select %s from public.network_nodes where api_key_hash=$1;`, selectNetworkNodeStatementFieldsQuery)
 	row, err := r.driver.QueryRow(ctx, q, apiKeyHash)
 	if err != nil {
 		return nil, err
@@ -533,12 +515,12 @@ func (r *Repository) GetNetworkNodeByAPIKeyHash(ctx context.Context, apiKeyHash 
 func (r *Repository) InsertPersonalDataNode(ctx context.Context, pdn *models.PersonalDataNode) error {
 	query := `insert into public.personal_data_nodes
   (id, created_at, last_modified_at, network_warden_id, holder_id, label, address, name, description, location,
-   accounts_capacity, alive, last_pinged_at, is_open, url, api_key_hash, version,
+   accounts_capacity, alive, last_pinged_at, is_open, is_invite_code_required, url, api_key_hash, version,
    rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node)
-  values ($1, $2, $3, $4, $5, $6, $7, $8, $9, ST_SetSRID(ST_MakePoint($10, $11), 4326), $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24);`
+  values ($1, $2, $3, $4, $5, $6, $7, $8, $9, ST_SetSRID(ST_MakePoint($10, $11), 4326), $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25);`
 	params := []interface{}{
 		pdn.ID, pdn.CreatedAt, pdn.LastModifiedAt, pdn.NetworkWardenID, pdn.HolderID, pdn.Label, pdn.Address, pdn.Name, pdn.Description, pdn.Location.Longitude, pdn.Location.Latitude,
-		pdn.AccountsCapacity, pdn.Alive, pdn.LastPingedAt, pdn.IsOpen, pdn.URL, pdn.APIKeyHash, pdn.Version,
+		pdn.AccountsCapacity, pdn.Alive, pdn.LastPingedAt, pdn.IsOpen, pdn.IsInviteCodeRequired, pdn.URL, pdn.APIKeyHash, pdn.Version,
 		pdn.RateLimitMaxRequests, pdn.RateLimitInterval, pdn.CrawlRateLimitMaxRequests, pdn.CrawlRateLimitInterval, pdn.Status, pdn.IDGenNode,
 	}
 	err := r.driver.ExecuteQuery(ctx, query, params...)
@@ -548,12 +530,12 @@ func (r *Repository) InsertPersonalDataNode(ctx context.Context, pdn *models.Per
 func (r *Repository) ModifyPersonalDataNode(ctx context.Context, id int64, pdn *models.PersonalDataNode) error {
 	query := `update public.personal_data_nodes
   set created_at=$2, last_modified_at=$3, network_warden_id=$4, holder_id=$5, label=$6, address=$7, name=$8, description=$9, location=ST_SetSRID(ST_MakePoint($10, $11), 4326),
-  accounts_capacity=$12, alive=$13, last_pinged_at=$14, is_open=$15, url=$16, api_key_hash=$17, version=$18,
-  rate_limit_max_requests=$19, rate_limit_interval=$20, crawl_rate_limit_max_requests=$21, crawl_rate_limit_interval=$22, status=$23, id_gen_node=$24
+  accounts_capacity=$12, alive=$13, last_pinged_at=$14, is_open=$15, is_invite_code_required=$16, url=$17, api_key_hash=$18, version=$19,
+  rate_limit_max_requests=$20, rate_limit_interval=$21, crawl_rate_limit_max_requests=$22, crawl_rate_limit_interval=$23, status=$24, id_gen_node=$25
   where id=$1;`
 	params := []interface{}{
 		pdn.ID, pdn.CreatedAt, pdn.LastModifiedAt, pdn.NetworkWardenID, pdn.HolderID, pdn.Label, pdn.Address, pdn.Name, pdn.Description, pdn.Location.Longitude, pdn.Location.Latitude,
-		pdn.AccountsCapacity, pdn.Alive, pdn.LastPingedAt, pdn.IsOpen, pdn.URL, pdn.APIKeyHash, pdn.Version,
+		pdn.AccountsCapacity, pdn.Alive, pdn.LastPingedAt, pdn.IsOpen, pdn.IsInviteCodeRequired, pdn.URL, pdn.APIKeyHash, pdn.Version,
 		pdn.RateLimitMaxRequests, pdn.RateLimitInterval, pdn.CrawlRateLimitMaxRequests, pdn.CrawlRateLimitInterval, pdn.Status, pdn.IDGenNode,
 	}
 	err := r.driver.ExecuteQuery(ctx, query, params...)
@@ -581,6 +563,7 @@ func (r *Repository) scanPersonalDataNode(rows scanner) (*models.PersonalDataNod
 		&pdn.Alive,
 		&pdn.LastPingedAt,
 		&pdn.IsOpen,
+		&pdn.IsInviteCodeRequired,
 		&pdn.URL,
 		&pdn.APIKeyHash,
 		&pdn.Version,
@@ -599,6 +582,10 @@ func (r *Repository) scanPersonalDataNode(rows scanner) (*models.PersonalDataNod
 	return &pdn, nil
 }
 
+const selectPersonalDataNodeStatementFieldsQuery = `id, created_at, last_modified_at, network_warden_id, holder_id, label, address, name, description, ST_X(location::geometry), ST_Y(location::geometry),
+    accounts_capacity, alive, last_pinged_at, is_open, is_invite_code_required, url, api_key_hash, version,
+    rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node`
+
 func (r *Repository) GetPersonalDataNodesList(ctx context.Context, filters map[string]interface{}, pagination *types.Pagination) ([]*models.PersonalDataNode, error) {
 	var (
 		whereStatements = make([]string, 0, len(filters))
@@ -615,12 +602,7 @@ func (r *Repository) GetPersonalDataNodesList(ctx context.Context, filters map[s
 		whereStatement = "where " + strings.Join(whereStatements, ", ")
 	}
 
-	q := fmt.Sprintf(`
-  select
-    id, created_at, last_modified_at, network_warden_id, holder_id, label, address, name, description, ST_X(location::geometry), ST_Y(location::geometry),
-    accounts_capacity, alive, last_pinged_at, is_open, url, api_key_hash, version,
-    rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node
-  from public.personal_data_nodes %s limit $1 offset $2;`, whereStatement)
+	q := fmt.Sprintf(`select %s from public.personal_data_nodes %s limit $1 offset $2;`, selectPersonalDataNodeStatementFieldsQuery, whereStatement)
 	rows, err := r.driver.QueryRows(ctx, q, args...)
 	if err != nil {
 		return nil, err
@@ -642,13 +624,7 @@ func (r *Repository) GetPersonalDataNodesList(ctx context.Context, filters map[s
 }
 
 func (r *Repository) GetPersonalDataNodeByLabel(ctx context.Context, label string) (*models.PersonalDataNode, error) {
-	q := `
-  select
-    id, created_at, last_modified_at, network_warden_id, holder_id, label, address, name, description, ST_X(location::geometry), ST_Y(location::geometry),
-    accounts_capacity, alive, last_pinged_at, is_open, url, api_key_hash, version,
-    rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node
-  from public.personal_data_nodes
-  where label=$1;`
+	q := fmt.Sprintf(`select %s from public.personal_data_nodes where label=$1;`, selectPersonalDataNodeStatementFieldsQuery)
 	row, err := r.driver.QueryRow(ctx, q, label)
 	if err != nil {
 		return nil, err
@@ -667,13 +643,7 @@ func (r *Repository) GetPersonalDataNodeByLabel(ctx context.Context, label strin
 }
 
 func (r *Repository) GetPersonalDataNodeByID(ctx context.Context, id int64) (*models.PersonalDataNode, error) {
-	q := `
-  select
-    id, created_at, last_modified_at, network_warden_id, holder_id, label, address, name, description, ST_X(location::geometry), ST_Y(location::geometry),
-    accounts_capacity, alive, last_pinged_at, is_open, url, api_key_hash, version,
-    rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node
-  from public.personal_data_nodes
-  where id=$1;`
+	q := fmt.Sprintf(`select %s from public.personal_data_nodes where id=$1;`, selectPersonalDataNodeStatementFieldsQuery)
 	row, err := r.driver.QueryRow(ctx, q, id)
 	if err != nil {
 		return nil, err
@@ -692,13 +662,7 @@ func (r *Repository) GetPersonalDataNodeByID(ctx context.Context, id int64) (*mo
 }
 
 func (r *Repository) GetPersonalDataNodeByAPIKeyHash(ctx context.Context, apiKeyHash string) (*models.PersonalDataNode, error) {
-	q := `
-  select
-    id, created_at, last_modified_at, network_warden_id, holder_id, label, address, name, description, ST_X(location::geometry), ST_Y(location::geometry),
-    accounts_capacity, alive, last_pinged_at, is_open, url, api_key_hash, version,
-    rate_limit_max_requests, rate_limit_interval, crawl_rate_limit_max_requests, crawl_rate_limit_interval, status, id_gen_node
-  from public.personal_data_nodes
-  where api_key_hash=$1;`
+	q := fmt.Sprintf(`select %s from public.personal_data_nodes where api_key_hash=$1;`, selectPersonalDataNodeStatementFieldsQuery)
 	row, err := r.driver.QueryRow(ctx, q, apiKeyHash)
 	if err != nil {
 		return nil, err

@@ -99,6 +99,7 @@ func (s *service) Insert(ctx context.Context, logger *zap.Logger, params *Insert
 		Alive:                     false,
 		LastPingedAt:              sql.NullTime{},
 		IsOpen:                    false,
+		IsInviteCodeRequired:      false,
 		URL:                       params.URL,
 		APIKeyHash:                "",
 		Version:                   "",
@@ -161,12 +162,13 @@ func (s *service) Activate(ctx context.Context, logger *zap.Logger, holderID, id
 }
 
 type InitiateParams struct {
-	AccountsCapacity int64
-	IsOpen           bool
-	Version          string
-	RateLimit        *types.RateLimit
-	CrawlRateLimit   *types.RateLimit
-	IDGenNode        int64
+	AccountsCapacity     int64
+	IsOpen               bool
+	IsInviteCodeRequired bool
+	Version              string
+	RateLimit            *types.RateLimit
+	CrawlRateLimit       *types.RateLimit
+	IDGenNode            int64
 }
 
 func (s *service) Initiate(ctx context.Context, logger *zap.Logger, apiKey string, params *InitiateParams) error {
@@ -187,6 +189,7 @@ func (s *service) Initiate(ctx context.Context, logger *zap.Logger, apiKey strin
 
 	pdn.AccountsCapacity = params.AccountsCapacity
 	pdn.IsOpen = params.IsOpen
+	pdn.IsInviteCodeRequired = params.IsInviteCodeRequired
 	pdn.Version = params.Version
 	pdn.RateLimitInterval = params.RateLimit.Interval
 	pdn.RateLimitMaxRequests = params.RateLimit.MaxRequests
