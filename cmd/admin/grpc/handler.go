@@ -11,6 +11,7 @@ import (
 	"github.com/ecumenos-social/network-warden/services/adminauth"
 	"github.com/ecumenos-social/network-warden/services/admins"
 	"github.com/ecumenos-social/network-warden/services/jwt"
+	personaldatanodes "github.com/ecumenos-social/network-warden/services/personal-data-nodes"
 	pbv1 "github.com/ecumenos-social/schemas/proto/gen/networkwarden/v1"
 	"github.com/samber/lo"
 	"go.uber.org/fx"
@@ -23,10 +24,11 @@ import (
 type Handler struct {
 	pbv1.AdminServiceServer
 
-	jwt    jwt.Service
-	admins admins.Service
-	auth   adminauth.Service
-	logger *zap.Logger
+	jwt                      jwt.Service
+	admins                   admins.Service
+	auth                     adminauth.Service
+	logger                   *zap.Logger
+	personalDataNodesService personaldatanodes.Service
 }
 
 var _ pbv1.AdminServiceServer = (*Handler)(nil)
@@ -34,17 +36,19 @@ var _ pbv1.AdminServiceServer = (*Handler)(nil)
 type handlerParams struct {
 	fx.In
 
-	AdminsService        admins.Service
-	AdminSessionsService adminauth.Service
-	AuthService          jwt.Service
-	Logger               *zap.Logger
+	AdminsService            admins.Service
+	AdminSessionsService     adminauth.Service
+	AuthService              jwt.Service
+	Logger                   *zap.Logger
+	PersonalDataNodesService personaldatanodes.Service
 }
 
 func NewHandler(params handlerParams) *Handler {
 	return &Handler{
-		jwt:    params.AuthService,
-		admins: params.AdminsService,
-		auth:   params.AdminSessionsService,
+		jwt:                      params.AuthService,
+		admins:                   params.AdminsService,
+		auth:                     params.AdminSessionsService,
+		personalDataNodesService: params.PersonalDataNodesService,
 
 		logger: params.Logger,
 	}
@@ -225,11 +229,27 @@ func (h *Handler) ChangeAdminPassword(ctx context.Context, req *pbv1.AdminServic
 	return &pbv1.AdminServiceChangeAdminPasswordResponse{Success: true}, nil
 }
 
-func (h *Handler) GetPersonalDataNodesList(ctx context.Context, _ *pbv1.AdminServiceGetPersonalDataNodesListRequest) (*pbv1.AdminServiceGetPersonalDataNodesListResponse, error) {
+func (h *Handler) GetPersonalDataNodesList(ctx context.Context, req *pbv1.AdminServiceGetPersonalDataNodesListRequest) (*pbv1.AdminServiceGetPersonalDataNodesListResponse, error) {
 	logger := h.customizeLogger(ctx, "GetPersonalDataNodesList")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	as, err := h.parseToken(ctx, logger, req.Token, lo.ToPtr(req.RemoteMacAddress), jwt.TokenScopeAccess)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("admin-id", as.AdminID))
+	pdns, err := h.personalDataNodesService.GetList(ctx, logger, 0, convertProtoPaginationToPagination(req.Pagination), false)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed get PDNs list, err=%v", err.Error())
+	}
+	data := make([]*pbv1.PersonalDataNode, 0, len(pdns))
+	for _, pdn := range pdns {
+		data = append(data, convertPersonalDataNodeToProtoPersonalDataNode(pdn))
+	}
+
+	return &pbv1.AdminServiceGetPersonalDataNodesListResponse{
+		Data: data,
+	}, nil
 }
 
 func (h *Handler) GetPersonalDataNodeByID(ctx context.Context, _ *pbv1.AdminServiceGetPersonalDataNodeByIDRequest) (*pbv1.AdminServiceGetPersonalDataNodeByIDResponse, error) {

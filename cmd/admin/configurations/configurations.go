@@ -4,6 +4,8 @@ import (
 	"github.com/ecumenos-social/network-warden/services/adminauth"
 	"github.com/ecumenos-social/network-warden/services/idgenerators"
 	"github.com/ecumenos-social/network-warden/services/jwt"
+	"github.com/ecumenos-social/toolkit/types"
+	"github.com/ecumenos-social/toolkitfx"
 	"github.com/ecumenos-social/toolkitfx/fxgrpc"
 	"github.com/ecumenos-social/toolkitfx/fxlogger"
 	"github.com/ecumenos-social/toolkitfx/fxpostgres"
@@ -14,19 +16,35 @@ import (
 type fxConfig struct {
 	fx.Out
 
-	Logger                   *fxlogger.Config
-	GRPC                     *fxgrpc.Config
-	Postgres                 *fxpostgres.Config
-	AdminSessionsIDGenerator *idgenerators.AdminSessionsIDGeneratorConfig
-	AdminsIDGenerator        *idgenerators.AdminsIDGeneratorConfig
-	JWT                      *jwt.Config
-	Auth                     *adminauth.Config
+	App                          *toolkitfx.GenericAppConfig
+	AppSpecific                  *toolkitfx.NetworkWardenAppConfig
+	Logger                       *fxlogger.Config
+	GRPC                         *fxgrpc.Config
+	Postgres                     *fxpostgres.Config
+	AdminSessionsIDGenerator     *idgenerators.AdminSessionsIDGeneratorConfig
+	AdminsIDGenerator            *idgenerators.AdminsIDGeneratorConfig
+	PersonalDataNodesIDGenerator *idgenerators.PersonalDataNodesIDGeneratorConfig
+	JWT                          *jwt.Config
+	Auth                         *adminauth.Config
 }
 
 var Module = func(cctx *cli.Context) fx.Option {
 	return fx.Options(
 		fx.Provide(func() fxConfig {
 			return fxConfig{
+				App: &toolkitfx.GenericAppConfig{
+					ID:          cctx.Int64("nw-app-id"),
+					IDGenNode:   cctx.Int64("nw-app-id-gen-node"),
+					Name:        cctx.String("nw-app-name"),
+					Description: cctx.String("nw-app-description"),
+					RateLimit: &types.RateLimit{
+						MaxRequests: cctx.Int64("nw-app-rate-limit-max-requests"),
+						Interval:    cctx.Duration("nw-app-rate-limit-interval"),
+					},
+				},
+				AppSpecific: &toolkitfx.NetworkWardenAppConfig{
+					AddressSuffix: cctx.String("nw-app-address-suffix"),
+				},
 				Logger: &fxlogger.Config{
 					Production: cctx.Bool("nw-admin-logger-production"),
 				},
@@ -61,6 +79,10 @@ var Module = func(cctx *cli.Context) fx.Option {
 					LowNodeID: 0,
 				},
 				AdminsIDGenerator: &idgenerators.AdminsIDGeneratorConfig{
+					TopNodeID: cctx.Int64("nw-app-id-gen-node"),
+					LowNodeID: 0,
+				},
+				PersonalDataNodesIDGenerator: &idgenerators.PersonalDataNodesIDGeneratorConfig{
 					TopNodeID: cctx.Int64("nw-app-id-gen-node"),
 					LowNodeID: 0,
 				},

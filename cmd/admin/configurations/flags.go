@@ -7,6 +7,48 @@ import (
 )
 
 var Flags = []cli.Flag{
+	&cli.Int64Flag{
+		Name:    "nw-app-id",
+		Usage:   "it is application ID",
+		Value:   0,
+		EnvVars: []string{"NETWORK_WARDEN_APP_ID"},
+	},
+	&cli.Int64Flag{
+		Name:    "nw-app-id-gen-node",
+		Usage:   "it is application ID generation node",
+		Value:   0,
+		EnvVars: []string{"NETWORK_WARDEN_APP_ID_GEN_NODE"},
+	},
+	&cli.StringFlag{
+		Name:    "nw-app-name",
+		Usage:   "it is unique application name",
+		Value:   "name",
+		EnvVars: []string{"NETWORK_WARDEN_APP_NAME"},
+	},
+	&cli.StringFlag{
+		Name:    "nw-app-description",
+		Usage:   "it is application description",
+		Value:   "it is network warden",
+		EnvVars: []string{"NETWORK_WARDEN_APP_DESCRIPTION"},
+	},
+	&cli.StringFlag{
+		Name:    "nw-app-address-suffix",
+		Usage:   "it is unique address suffix specific for this network warden",
+		Value:   "nw",
+		EnvVars: []string{"NETWORK_WARDEN_APP_ADDRESS_SUFFIX"},
+	},
+	&cli.Int64Flag{
+		Name:    "nw-app-rate-limit-max-requests",
+		Usage:   "it is rate limit max requests amount",
+		Value:   1000,
+		EnvVars: []string{"NETWORK_WARDEN_APP_RATE_LIMIT_MAX_REQUESTS"},
+	},
+	&cli.DurationFlag{
+		Name:    "nw-app-rate-limit-interval",
+		Usage:   "it is rate limit interval",
+		Value:   time.Minute,
+		EnvVars: []string{"NETWORK_WARDEN_APP_RATE_LIMIT_INTERVAL"},
+	},
 	&cli.BoolFlag{
 		Name:    "nw-admin-logger-production",
 		Usage:   "make it true if you need logging on production environment",

@@ -33,6 +33,7 @@ var Dependencies = fx.Options(
 		personaldatanodes.New,
 		idgenerators.NewAdminsIDGenerator,
 		idgenerators.NewAdminSessionsIDGenerator,
+		idgenerators.NewPersonalDataNodesIDGenerator,
 		pgseeds.New,
 	),
 )
