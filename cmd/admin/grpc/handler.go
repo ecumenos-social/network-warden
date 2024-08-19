@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strconv"
 
@@ -148,11 +149,35 @@ func (h *Handler) LoginAdmin(ctx context.Context, req *pbv1.AdminServiceLoginAdm
 	}, nil
 }
 
-func (h *Handler) RefreshAdminToken(ctx context.Context, _ *pbv1.AdminServiceRefreshAdminTokenRequest) (*pbv1.AdminServiceRefreshAdminTokenResponse, error) {
+func (h *Handler) RefreshAdminToken(ctx context.Context, req *pbv1.AdminServiceRefreshAdminTokenRequest) (*pbv1.AdminServiceRefreshAdminTokenResponse, error) {
 	logger := h.customizeLogger(ctx, "RefreshAdminToken")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	as, err := h.parseToken(ctx, logger, req.RefreshToken, lo.ToPtr(req.RemoteMacAddress), jwt.TokenScopeRefresh)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("admin-id", as.AdminID))
+
+	token, refreshToken, err := h.jwt.CreateTokens(ctx, logger, fmt.Sprint(as.AdminID))
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed create tokens (error = %v)", err.Error())
+	}
+
+	as.Token = token
+	as.RefreshToken = refreshToken
+	as.ExpiredAt = sql.NullTime{
+		Time:  h.auth.GetExpiredAtForAdminSession(),
+		Valid: true,
+	}
+	if err := h.auth.ModifyAdminSession(ctx, logger, as.AdminID, as); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed modify session (error = %v)", err.Error())
+	}
+
+	return &pbv1.AdminServiceRefreshAdminTokenResponse{
+		Token:        token,
+		RefreshToken: refreshToken,
+	}, nil
 }
 
 func (h *Handler) LogoutAdmin(ctx context.Context, req *pbv1.AdminServiceLogoutAdminRequest) (*pbv1.AdminServiceLogoutAdminResponse, error) {
