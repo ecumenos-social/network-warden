@@ -17,11 +17,14 @@ type Repository interface {
 	GetAdminByPhoneNumber(ctx context.Context, phoneNumber string) (*models.Admin, error)
 	GetAdminByID(ctx context.Context, id int64) (*models.Admin, error)
 	InsertAdmin(ctx context.Context, admin *models.Admin) error
+	ModifyAdmin(ctx context.Context, id int64, admin *models.Admin) error
 }
 
 type Service interface {
-	GetHolderByEmailOrPhoneNumber(ctx context.Context, logger *zap.Logger, email, phoneNumber string) (a *models.Admin, err error)
-	ValidatePassword(_ context.Context, logger *zap.Logger, a *models.Admin, password string) error
+	GetAdminByEmailOrPhoneNumber(ctx context.Context, logger *zap.Logger, email, phoneNumber string) (a *models.Admin, err error)
+	ValidatePassword(ctx context.Context, logger *zap.Logger, a *models.Admin, password string) error
+	GetAdminByID(ctx context.Context, logger *zap.Logger, id int64) (*models.Admin, error)
+	ChangePassword(ctx context.Context, logger *zap.Logger, admin *models.Admin, password string) error
 }
 
 type service struct {
@@ -36,7 +39,7 @@ func New(repo Repository, idgenerator idgenerators.AdminsIDGenerator) Service {
 	}
 }
 
-func (s *service) GetHolderByEmailOrPhoneNumber(ctx context.Context, logger *zap.Logger, email, phoneNumber string) (a *models.Admin, err error) {
+func (s *service) GetAdminByEmailOrPhoneNumber(ctx context.Context, logger *zap.Logger, email, phoneNumber string) (a *models.Admin, err error) {
 	if email == "" && phoneNumber == "" {
 		logger.Error("failed to hash password")
 		return nil, errorwrapper.New("can not query admin if email address is empty and phone number is empty")
@@ -71,4 +74,30 @@ func (s *service) ValidatePassword(_ context.Context, logger *zap.Logger, a *mod
 	logger.Error("invalid password")
 
 	return errorwrapper.New("invalid password")
+}
+
+func (s *service) GetAdminByID(ctx context.Context, logger *zap.Logger, id int64) (*models.Admin, error) {
+	admin, err := s.repo.GetAdminByID(ctx, id)
+	if err != nil {
+		logger.Error("failed get admin by id", zap.Error(err))
+		return nil, err
+	}
+
+	return admin, nil
+}
+
+func (s *service) ChangePassword(ctx context.Context, logger *zap.Logger, admin *models.Admin, password string) error {
+	passwordHash, err := hash.Hash(password)
+	if err != nil {
+		logger.Error("failed to hash password", zap.Error(err))
+		return err
+	}
+
+	admin.PasswordHash = passwordHash
+	if err := s.repo.ModifyAdmin(ctx, admin.ID, admin); err != nil {
+		logger.Error("failed to modify admin to change password", zap.Error(err))
+		return err
+	}
+
+	return nil
 }
