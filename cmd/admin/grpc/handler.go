@@ -3,8 +3,10 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	grpcutils "github.com/ecumenos-social/grpc-utils"
+	"github.com/ecumenos-social/network-warden/models"
 	"github.com/ecumenos-social/network-warden/services/adminauth"
 	"github.com/ecumenos-social/network-warden/services/admins"
 	"github.com/ecumenos-social/network-warden/services/jwt"
@@ -86,6 +88,39 @@ func (h *Handler) createSession(ctx context.Context, logger *zap.Logger, adminID
 	return token, refreshToken, nil
 }
 
+func (h *Handler) parseToken(ctx context.Context, logger *zap.Logger, token string, remoteMacAddress *string, scope jwt.TokenScope) (*models.AdminSession, error) {
+	t, err := h.jwt.DecodeToken(logger, token)
+	if err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "invalid token")
+	}
+	anyAdminID, ok := t.Get("sub")
+	if !ok {
+		return nil, status.Errorf(codes.Unauthenticated, "invalid token, it doesn't contain admin information")
+	}
+
+	if _, err := strconv.ParseInt(fmt.Sprint(anyAdminID), 10, 64); err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "invalid token, admin information is formatted incorrectly")
+	}
+
+	as, err := h.auth.GetAdminSessionByToken(ctx, logger, token, scope)
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, err.Error())
+	}
+	if as.RemoteIPAddress.Valid && as.RemoteIPAddress.String != grpcutils.ExtractRemoteIPAddress(ctx) {
+		logger.Error("remote IP address doesn't match with session's remote IP address", zap.String("session-remote-ip-address", as.RemoteIPAddress.String), zap.String("incoming-remote-ip-address", grpcutils.ExtractRemoteIPAddress(ctx)))
+		return nil, status.Error(codes.PermissionDenied, "no permissions")
+	}
+	if remoteMacAddress != nil {
+		logger = logger.With(zap.String("incoming-remote-mac-address", *remoteMacAddress))
+		if as.RemoteMACAddress.Valid && as.RemoteMACAddress.String != *remoteMacAddress {
+			logger.Error("remote MAC address doesn't match with session's remote MAC address", zap.String("session-remote-mac-address", as.RemoteMACAddress.String))
+			return nil, status.Error(codes.PermissionDenied, "no permissions")
+		}
+	}
+
+	return as, nil
+}
+
 func (h *Handler) LoginAdmin(ctx context.Context, req *pbv1.AdminServiceLoginAdminRequest) (*pbv1.AdminServiceLoginAdminResponse, error) {
 	logger := h.customizeLogger(ctx, "LoginAdmin")
 	defer logger.Info("request processed")
@@ -120,11 +155,21 @@ func (h *Handler) RefreshAdminToken(ctx context.Context, _ *pbv1.AdminServiceRef
 	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
 }
 
-func (h *Handler) LogoutAdmin(ctx context.Context, _ *pbv1.AdminServiceLogoutAdminRequest) (*pbv1.AdminServiceLogoutAdminResponse, error) {
+func (h *Handler) LogoutAdmin(ctx context.Context, req *pbv1.AdminServiceLogoutAdminRequest) (*pbv1.AdminServiceLogoutAdminResponse, error) {
 	logger := h.customizeLogger(ctx, "LogoutAdmin")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	as, err := h.parseToken(ctx, logger, req.Token, lo.ToPtr(req.RemoteMacAddress), jwt.TokenScopeAccess)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("admin-id", as.AdminID))
+
+	if err := h.auth.MakeAdminSessionExpired(ctx, logger, as.AdminID, as); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed modify session (error = %v)", err.Error())
+	}
+
+	return &pbv1.AdminServiceLogoutAdminResponse{Success: true}, nil
 }
 
 func (h *Handler) ChangeAdminPassword(ctx context.Context, _ *pbv1.AdminServiceChangeAdminPasswordRequest) (*pbv1.AdminServiceChangeAdminPasswordResponse, error) {
