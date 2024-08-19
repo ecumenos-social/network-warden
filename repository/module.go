@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"github.com/ecumenos-social/network-warden/services/adminauth"
+	"github.com/ecumenos-social/network-warden/services/admins"
 	"github.com/ecumenos-social/network-warden/services/auth"
 	"github.com/ecumenos-social/network-warden/services/emailer"
 	"github.com/ecumenos-social/network-warden/services/holders"
@@ -19,5 +21,7 @@ var Module = fx.Options(
 		func(r *Repository) networknodes.Repository { return networknodes.Repository(r) },
 		func(r *Repository) personaldatanodes.Repository { return personaldatanodes.Repository(r) },
 		func(r *Repository) networkwardens.Repository { return networkwardens.Repository(r) },
+		func(r *Repository) admins.Repository { return admins.Repository(r) },
+		func(r *Repository) adminauth.Repository { return adminauth.Repository(r) },
 	),
 )
