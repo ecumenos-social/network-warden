@@ -126,7 +126,7 @@ func (h *Handler) LoginAdmin(ctx context.Context, req *pbv1.AdminServiceLoginAdm
 	logger := h.customizeLogger(ctx, "LoginAdmin")
 	defer logger.Info("request processed")
 
-	admin, err := h.admins.GetHolderByEmailOrPhoneNumber(ctx, logger, req.Email, req.PhoneNumber)
+	admin, err := h.admins.GetAdminByEmailOrPhoneNumber(ctx, logger, req.Email, req.PhoneNumber)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed get admin, err=%v", err.Error())
 	}
@@ -197,11 +197,32 @@ func (h *Handler) LogoutAdmin(ctx context.Context, req *pbv1.AdminServiceLogoutA
 	return &pbv1.AdminServiceLogoutAdminResponse{Success: true}, nil
 }
 
-func (h *Handler) ChangeAdminPassword(ctx context.Context, _ *pbv1.AdminServiceChangeAdminPasswordRequest) (*pbv1.AdminServiceChangeAdminPasswordResponse, error) {
+func (h *Handler) ChangeAdminPassword(ctx context.Context, req *pbv1.AdminServiceChangeAdminPasswordRequest) (*pbv1.AdminServiceChangeAdminPasswordResponse, error) {
 	logger := h.customizeLogger(ctx, "ChangeAdminPassword")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	as, err := h.parseToken(ctx, logger, req.Token, lo.ToPtr(req.RemoteMacAddress), jwt.TokenScopeAccess)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("admin-id", as.AdminID))
+
+	admin, err := h.admins.GetAdminByID(ctx, logger, as.AdminID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed get admin, err=%v", err.Error())
+	}
+	if admin == nil {
+		logger.Error("admin not found")
+		return nil, status.Error(codes.InvalidArgument, "admin not found")
+	}
+	if err := h.admins.ValidatePassword(ctx, logger, admin, req.Password); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid password")
+	}
+	if err := h.admins.ChangePassword(ctx, logger, admin, req.NewPassword); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "failed to change admin's password")
+	}
+
+	return &pbv1.AdminServiceChangeAdminPasswordResponse{Success: true}, nil
 }
 
 func (h *Handler) GetPersonalDataNodesList(ctx context.Context, _ *pbv1.AdminServiceGetPersonalDataNodesListRequest) (*pbv1.AdminServiceGetPersonalDataNodesListResponse, error) {

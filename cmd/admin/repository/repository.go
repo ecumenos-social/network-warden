@@ -165,14 +165,27 @@ func (r *Repository) GetAdminByID(ctx context.Context, id int64) (*models.Admin,
 	return nil, err
 }
 
-func (r *Repository) InsertAdmin(ctx context.Context, holder *models.Admin) error {
+func (r *Repository) InsertAdmin(ctx context.Context, admin *models.Admin) error {
 	query := `insert into public.admins
   (id, created_at, last_modified_at, emails, phone_numbers, avatar_image_url, countries, languages, password_hash)
   values ($1, $2, $3, $4, $5, $6, $7, $8, $9);`
 	params := []interface{}{
-		holder.ID, holder.CreatedAt, holder.LastModifiedAt,
-		holder.Emails, holder.PhoneNumbers, holder.AvatarImageURL, holder.Countries, holder.Languages,
-		holder.PasswordHash,
+		admin.ID, admin.CreatedAt, admin.LastModifiedAt,
+		admin.Emails, admin.PhoneNumbers, admin.AvatarImageURL, admin.Countries, admin.Languages,
+		admin.PasswordHash,
+	}
+	err := r.driver.ExecuteQuery(ctx, query, params...)
+	return err
+}
+
+func (r *Repository) ModifyAdmin(ctx context.Context, id int64, admin *models.Admin) error {
+	query := `update public.admins
+  set created_at=$2, last_modified_at=$3, emails=$4, phone_numbers=$5, avatar_image_url=$6, countries=$7, languages=$8, password_hash=$9
+  where id=$1;`
+	params := []interface{}{
+		admin.ID, admin.CreatedAt, admin.LastModifiedAt,
+		admin.Emails, admin.PhoneNumbers, admin.AvatarImageURL, admin.Countries, admin.Languages,
+		admin.PasswordHash,
 	}
 	err := r.driver.ExecuteQuery(ctx, query, params...)
 	return err
