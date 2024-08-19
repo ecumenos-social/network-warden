@@ -49,7 +49,7 @@ var _ pbv1.NetworkWardenServiceServer = (*Handler)(nil)
 type handlerParams struct {
 	fx.In
 
-	Config                   *toolkitfx.NetworkWardenAppConfig
+	AppConfig                *toolkitfx.GenericAppConfig
 	HoldersService           holders.Service
 	HolderSessionsService    auth.Service
 	AuthService              jwt.Service
@@ -73,7 +73,7 @@ func NewHandler(params handlerParams) *Handler {
 		networkWardensService:    params.NetworkWardensService,
 		logger:                   params.Logger,
 
-		networkWardenID: params.Config.ID,
+		networkWardenID: params.AppConfig.ID,
 	}
 }
 

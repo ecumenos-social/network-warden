@@ -47,8 +47,8 @@ github.com/ecumenos-social/schemas v0.0.22 h1:smJBTDkYr48bGStbBqIg9r5OPX7E3WLrF9
 github.com/ecumenos-social/schemas v0.0.22/go.mod h1:yhQTZ0KM0vo3I9ozfsC19du6lg9kkRJPU6X+Uc0dj3o=
 github.com/ecumenos-social/toolkit v0.0.4 h1:9/DY7Ij4+/97zuzvWFANrn8XRasWaKXmN3cYbHz7otM=
 github.com/ecumenos-social/toolkit v0.0.4/go.mod h1:om/rsggY8Phf3rsY1eKVydVDUuTdsDZwdN5ji7b3JgA=
-github.com/ecumenos-social/toolkitfx v0.1.2 h1:ZDs0GE1UK2wpg4KFUBrXDtzUZdD9HwgF6U0eBVlFgrU=
-github.com/ecumenos-social/toolkitfx v0.1.2/go.mod h1:rvtTUQzgZlK9JmBqMVKULGQnG8LzgyL+kta66DLMyJc=
+github.com/ecumenos-social/toolkitfx v0.1.4 h1:GAagwDyaM5dawB/6dWhB5oHoSaqH7BdEY4gucSk1MZY=
+github.com/ecumenos-social/toolkitfx v0.1.4/go.mod h1:rvtTUQzgZlK9JmBqMVKULGQnG8LzgyL+kta66DLMyJc=
 github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.1-0.20191026205805-5f8ba28d4473/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.4/go.mod h1:6rpuAdCZL397s3pYoYcLgu1mIlRU8Am5FuJP05cCM98=

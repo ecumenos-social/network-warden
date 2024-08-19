@@ -39,12 +39,12 @@ type service struct {
 	networkWardenAddressSuffix string
 }
 
-func New(config *toolkitfx.NetworkWardenAppConfig, repo Repository, g idgenerators.PersonalDataNodesIDGenerator) Service {
+func New(cfg *toolkitfx.GenericAppConfig, spcCfg *toolkitfx.NetworkWardenAppConfig, repo Repository, g idgenerators.PersonalDataNodesIDGenerator) Service {
 	return &service{
 		repo:                       repo,
 		idgenerator:                g,
-		networkWardenID:            config.ID,
-		networkWardenAddressSuffix: config.AddressSuffix,
+		networkWardenID:            cfg.ID,
+		networkWardenAddressSuffix: spcCfg.AddressSuffix,
 	}
 }
 

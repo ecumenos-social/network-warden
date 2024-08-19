@@ -32,7 +32,7 @@ type service struct {
 	networkWardenID int64
 }
 
-func New(config *toolkitfx.NetworkWardenAppConfig, repo Repository, g idgenerators.NetworkWardensIDGenerator) Service {
+func New(config *toolkitfx.GenericAppConfig, repo Repository, g idgenerators.NetworkWardensIDGenerator) Service {
 	return &service{
 		repo:            repo,
 		idgenerator:     g,

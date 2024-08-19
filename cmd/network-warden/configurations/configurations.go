@@ -18,7 +18,8 @@ import (
 type fxConfig struct {
 	fx.Out
 
-	App                          *toolkitfx.NetworkWardenAppConfig
+	App                          *toolkitfx.GenericAppConfig
+	AppSpecific                  *toolkitfx.NetworkWardenAppConfig
 	Logger                       *fxlogger.Config
 	GRPC                         *fxgrpc.Config
 	Postgres                     *fxpostgres.Config
@@ -38,13 +39,18 @@ var Module = func(cctx *cli.Context) fx.Option {
 	return fx.Options(
 		fx.Provide(func() fxConfig {
 			return fxConfig{
-				App: &toolkitfx.NetworkWardenAppConfig{
-					ID:            cctx.Int64("nw-app-id"),
-					IDGenNode:     cctx.Int64("nw-app-id-gen-node"),
-					Name:          cctx.String("nw-app-name"),
-					Description:   cctx.String("nw-app-description"),
+				App: &toolkitfx.GenericAppConfig{
+					ID:          cctx.Int64("nw-app-id"),
+					IDGenNode:   cctx.Int64("nw-app-id-gen-node"),
+					Name:        cctx.String("nw-app-name"),
+					Description: cctx.String("nw-app-description"),
+					RateLimit: &types.RateLimit{
+						MaxRequests: cctx.Int64("nw-app-rate-limit-max-requests"),
+						Interval:    cctx.Duration("nw-app-rate-limit-interval"),
+					},
+				},
+				AppSpecific: &toolkitfx.NetworkWardenAppConfig{
 					AddressSuffix: cctx.String("nw-app-address-suffix"),
-					RateLimit:     &types.RateLimit{MaxRequests: cctx.Int64("nw-app-rate-limit-max-requests"), Interval: cctx.Duration("nw-app-rate-limit-interval")},
 				},
 				Logger: &fxlogger.Config{
 					Production: cctx.Bool("nw-logger-production"),
