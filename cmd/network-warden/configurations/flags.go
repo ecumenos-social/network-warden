@@ -136,7 +136,7 @@ var Flags = []cli.Flag{
 	&cli.StringFlag{
 		Name:    "nw-postgres-migrations-path",
 		Usage:   "it is path to directory with postgres migrations",
-		Value:   `file://cmd/network-warden/pgmigrations`,
+		Value:   `file://pgmigrations`,
 		EnvVars: []string{"NETWORK_WARDEN_POSTGRES_MIGRATIONS_PATH"},
 	},
 	&cli.StringFlag{

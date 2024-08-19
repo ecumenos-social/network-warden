@@ -4,11 +4,12 @@ import (
 	"github.com/ecumenos-social/network-warden/cmd/admin/configurations"
 	"github.com/ecumenos-social/network-warden/cmd/admin/grpc"
 	"github.com/ecumenos-social/network-warden/cmd/admin/pgseeds"
-	"github.com/ecumenos-social/network-warden/cmd/admin/repository"
+	"github.com/ecumenos-social/network-warden/repository"
 	"github.com/ecumenos-social/network-warden/services/adminauth"
 	"github.com/ecumenos-social/network-warden/services/admins"
 	"github.com/ecumenos-social/network-warden/services/idgenerators"
 	"github.com/ecumenos-social/network-warden/services/jwt"
+	personaldatanodes "github.com/ecumenos-social/network-warden/services/personal-data-nodes"
 	"github.com/ecumenos-social/toolkitfx"
 	"github.com/ecumenos-social/toolkitfx/fxgrpc"
 	"github.com/ecumenos-social/toolkitfx/fxlogger"
@@ -29,6 +30,7 @@ var Dependencies = fx.Options(
 		admins.New,
 		adminauth.New,
 		jwt.New,
+		personaldatanodes.New,
 		idgenerators.NewAdminsIDGenerator,
 		idgenerators.NewAdminSessionsIDGenerator,
 		pgseeds.New,
