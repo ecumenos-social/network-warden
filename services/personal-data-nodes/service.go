@@ -31,6 +31,7 @@ type Service interface {
 	Initiate(ctx context.Context, logger *zap.Logger, apiKey string, params *InitiateParams) error
 	GetList(ctx context.Context, logger *zap.Logger, holderID int64, pagination *types.Pagination, onlyMy bool) ([]*models.PersonalDataNode, error)
 	GetByID(ctx context.Context, logger *zap.Logger, id int64) (*models.PersonalDataNode, error)
+	SetStatusByID(ctx context.Context, logger *zap.Logger, id int64, status models.PersonalDataNodeStatus) error
 }
 
 type service struct {
@@ -216,4 +217,19 @@ func (s *service) GetList(ctx context.Context, logger *zap.Logger, holderID int6
 
 func (s *service) GetByID(ctx context.Context, logger *zap.Logger, id int64) (*models.PersonalDataNode, error) {
 	return s.repo.GetPersonalDataNodeByID(ctx, id)
+}
+
+func (s *service) SetStatusByID(ctx context.Context, logger *zap.Logger, id int64, status models.PersonalDataNodeStatus) error {
+	pdn, err := s.repo.GetPersonalDataNodeByID(ctx, id)
+	if err != nil {
+		logger.Error("failed to get personal data node by id", zap.Error(err), zap.Int64("personal-data-node-id", id))
+		return err
+	}
+	pdn.Status = status
+	if err := s.repo.ModifyPersonalDataNode(ctx, pdn.ID, pdn); err != nil {
+		logger.Error("failed to modify personal data node", zap.Error(err), zap.Int64("personal-data-node-id", pdn.ID))
+		return errorwrapper.New("failed to modify personal data node")
+	}
+
+	return nil
 }
