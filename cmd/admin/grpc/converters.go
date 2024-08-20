@@ -19,6 +19,19 @@ func convertProtoPaginationToPagination(p *v1.Pagination) *types.Pagination {
 	return types.NewPagination(p.Limit, p.Offset)
 }
 
+func convertProtoPersonalDataNodeStatusToPersonalDataNodeStatus(status pbv1.PersonalDataNode_Status) models.PersonalDataNodeStatus {
+	switch status {
+	case pbv1.PersonalDataNode_STATUS_APPROVED:
+		return models.PersonalDataNodeStatusApproved
+	case pbv1.PersonalDataNode_STATUS_PENDING:
+		return models.PersonalDataNodeStatusPending
+	case pbv1.PersonalDataNode_STATUS_REJECTED:
+		return models.PersonalDataNodeStatusRejected
+	}
+
+	return ""
+}
+
 func convertPersonalDataNodeToProtoPersonalDataNode(pdn *models.PersonalDataNode) *pbv1.PersonalDataNode {
 	var lastPingedAt string
 	if pdn.LastPingedAt.Valid {

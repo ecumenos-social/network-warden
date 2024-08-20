@@ -281,11 +281,25 @@ func (h *Handler) GetPersonalDataNodeByID(ctx context.Context, req *pbv1.AdminSe
 	}, nil
 }
 
-func (h *Handler) SetPersonalDataNodeStatus(ctx context.Context, _ *pbv1.AdminServiceSetPersonalDataNodeStatusRequest) (*pbv1.AdminServiceSetPersonalDataNodeStatusResponse, error) {
+func (h *Handler) SetPersonalDataNodeStatus(ctx context.Context, req *pbv1.AdminServiceSetPersonalDataNodeStatusRequest) (*pbv1.AdminServiceSetPersonalDataNodeStatusResponse, error) {
 	logger := h.customizeLogger(ctx, "SetPersonalDataNodeStatus")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	as, err := h.parseToken(ctx, logger, req.Token, lo.ToPtr(req.RemoteMacAddress), jwt.TokenScopeAccess)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("admin-id", as.AdminID))
+	pdnID, err := strconv.ParseInt(req.Id, 10, 64)
+	if err != nil {
+		logger.Error("invalid ID", zap.Error(err), zap.String("incoming-personal-data-node-id", req.Id))
+		return nil, status.Error(codes.InvalidArgument, "invalid ID")
+	}
+	if err := h.personalDataNodesService.SetStatusByID(ctx, logger, pdnID, convertProtoPersonalDataNodeStatusToPersonalDataNodeStatus(req.Status)); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "failed to update personal data node status")
+	}
+
+	return &pbv1.AdminServiceSetPersonalDataNodeStatusResponse{Success: true}, nil
 }
 
 func (h *Handler) GetNetworkNodesList(ctx context.Context, _ *pbv1.AdminServiceGetNetworkNodesListRequest) (*pbv1.AdminServiceGetNetworkNodesListResponse, error) {
