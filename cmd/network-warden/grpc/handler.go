@@ -8,6 +8,7 @@ import (
 
 	errorwrapper "github.com/ecumenos-social/error-wrapper"
 	grpcutils "github.com/ecumenos-social/grpc-utils"
+	"github.com/ecumenos-social/network-warden/converters"
 	"github.com/ecumenos-social/network-warden/models"
 	"github.com/ecumenos-social/network-warden/services/auth"
 	"github.com/ecumenos-social/network-warden/services/emailer"
@@ -502,7 +503,7 @@ func (h *Handler) GetHolder(ctx context.Context, req *pbv1.NetworkWardenServiceG
 		return nil, status.Error(codes.InvalidArgument, "holder not found")
 	}
 
-	return &pbv1.NetworkWardenServiceGetHolderResponse{Data: convertHolderToProtoHolder(holder)}, nil
+	return &pbv1.NetworkWardenServiceGetHolderResponse{Data: converters.ConvertHolderToProtoHolder(holder)}, nil
 }
 
 func (h *Handler) DeleteHolder(ctx context.Context, req *pbv1.NetworkWardenServiceDeleteHolderRequest) (*pbv1.NetworkWardenServiceDeleteHolderResponse, error) {
@@ -569,7 +570,7 @@ func (h *Handler) GetPersonalDataNodesList(ctx context.Context, req *pbv1.Networ
 		ctx,
 		logger,
 		holderID,
-		convertProtoPaginationToPagination(req.Pagination),
+		converters.ConvertProtoPaginationToPagination(req.Pagination),
 		req.OnlyMy != nil && *req.OnlyMy,
 	)
 	if err != nil {
@@ -577,7 +578,7 @@ func (h *Handler) GetPersonalDataNodesList(ctx context.Context, req *pbv1.Networ
 	}
 	data := make([]*pbv1.PersonalDataNode, 0, len(pdns))
 	for _, pdn := range pdns {
-		data = append(data, convertPersonalDataNodeToProtoPersonalDataNode(pdn))
+		data = append(data, converters.ConvertPersonalDataNodeToProtoPersonalDataNode(pdn))
 	}
 
 	return &pbv1.NetworkWardenServiceGetPersonalDataNodesListResponse{
@@ -698,7 +699,7 @@ func (h *Handler) GetNetworkNodesList(ctx context.Context, req *pbv1.NetworkWard
 		ctx,
 		logger,
 		holderID,
-		convertProtoPaginationToPagination(req.Pagination),
+		converters.ConvertProtoPaginationToPagination(req.Pagination),
 		req.OnlyMy != nil && *req.OnlyMy,
 	)
 	if err != nil {
@@ -707,7 +708,7 @@ func (h *Handler) GetNetworkNodesList(ctx context.Context, req *pbv1.NetworkWard
 	}
 	data := make([]*pbv1.NetworkNode, 0, len(nns))
 	for _, nn := range nns {
-		data = append(data, convertNetworkNodeToProtoNetworkNode(nn))
+		data = append(data, converters.ConvertNetworkNodeToProtoNetworkNode(nn))
 	}
 
 	return &pbv1.NetworkWardenServiceGetNetworkNodesListResponse{
@@ -814,7 +815,7 @@ func (h *Handler) GetNetworkWardensList(ctx context.Context, req *pbv1.NetworkWa
 	nws, err := h.networkWardensService.GetList(
 		ctx,
 		logger,
-		convertProtoPaginationToPagination(req.Pagination),
+		converters.ConvertProtoPaginationToPagination(req.Pagination),
 	)
 	if err != nil {
 		logger.Error("failed to get list", zap.Error(err))
@@ -822,7 +823,7 @@ func (h *Handler) GetNetworkWardensList(ctx context.Context, req *pbv1.NetworkWa
 	}
 	data := make([]*pbv1.NetworkWarden, 0, len(nws))
 	for _, nw := range nws {
-		data = append(data, convertNetworkWardenToProtoNetworkWarden(nw))
+		data = append(data, converters.ConvertNetworkWardenToProtoNetworkWarden(nw))
 	}
 
 	return &pbv1.NetworkWardenServiceGetNetworkWardensListResponse{
