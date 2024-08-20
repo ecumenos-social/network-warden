@@ -7,10 +7,12 @@ import (
 	"strconv"
 
 	grpcutils "github.com/ecumenos-social/grpc-utils"
+	"github.com/ecumenos-social/network-warden/converters"
 	"github.com/ecumenos-social/network-warden/models"
 	"github.com/ecumenos-social/network-warden/services/adminauth"
 	"github.com/ecumenos-social/network-warden/services/admins"
 	"github.com/ecumenos-social/network-warden/services/jwt"
+	networknodes "github.com/ecumenos-social/network-warden/services/network-nodes"
 	personaldatanodes "github.com/ecumenos-social/network-warden/services/personal-data-nodes"
 	pbv1 "github.com/ecumenos-social/schemas/proto/gen/networkwarden/v1"
 	"github.com/samber/lo"
@@ -29,6 +31,7 @@ type Handler struct {
 	auth                     adminauth.Service
 	logger                   *zap.Logger
 	personalDataNodesService personaldatanodes.Service
+	networkNodesService      networknodes.Service
 }
 
 var _ pbv1.AdminServiceServer = (*Handler)(nil)
@@ -41,6 +44,7 @@ type handlerParams struct {
 	AuthService              jwt.Service
 	Logger                   *zap.Logger
 	PersonalDataNodesService personaldatanodes.Service
+	NetworkNodesService      networknodes.Service
 }
 
 func NewHandler(params handlerParams) *Handler {
@@ -49,6 +53,7 @@ func NewHandler(params handlerParams) *Handler {
 		admins:                   params.AdminsService,
 		auth:                     params.AdminSessionsService,
 		personalDataNodesService: params.PersonalDataNodesService,
+		networkNodesService:      params.NetworkNodesService,
 
 		logger: params.Logger,
 	}
@@ -238,13 +243,13 @@ func (h *Handler) GetPersonalDataNodesList(ctx context.Context, req *pbv1.AdminS
 		return nil, err
 	}
 	logger = logger.With(zap.Int64("admin-id", as.AdminID))
-	pdns, err := h.personalDataNodesService.GetList(ctx, logger, 0, convertProtoPaginationToPagination(req.Pagination), false)
+	pdns, err := h.personalDataNodesService.GetList(ctx, logger, 0, converters.ConvertProtoPaginationToPagination(req.Pagination), false)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed get PDNs list, err=%v", err.Error())
 	}
 	data := make([]*pbv1.PersonalDataNode, 0, len(pdns))
 	for _, pdn := range pdns {
-		data = append(data, convertPersonalDataNodeToProtoPersonalDataNode(pdn))
+		data = append(data, converters.ConvertPersonalDataNodeToProtoPersonalDataNode(pdn))
 	}
 
 	return &pbv1.AdminServiceGetPersonalDataNodesListResponse{
@@ -277,7 +282,7 @@ func (h *Handler) GetPersonalDataNodeByID(ctx context.Context, req *pbv1.AdminSe
 	}
 
 	return &pbv1.AdminServiceGetPersonalDataNodeByIDResponse{
-		Data: convertPersonalDataNodeToProtoPersonalDataNode(pdn),
+		Data: converters.ConvertPersonalDataNodeToProtoPersonalDataNode(pdn),
 	}, nil
 }
 
@@ -295,18 +300,34 @@ func (h *Handler) SetPersonalDataNodeStatus(ctx context.Context, req *pbv1.Admin
 		logger.Error("invalid ID", zap.Error(err), zap.String("incoming-personal-data-node-id", req.Id))
 		return nil, status.Error(codes.InvalidArgument, "invalid ID")
 	}
-	if err := h.personalDataNodesService.SetStatusByID(ctx, logger, pdnID, convertProtoPersonalDataNodeStatusToPersonalDataNodeStatus(req.Status)); err != nil {
+	if err := h.personalDataNodesService.SetStatusByID(ctx, logger, pdnID, converters.ConvertProtoPersonalDataNodeStatusToPersonalDataNodeStatus(req.Status)); err != nil {
 		return nil, status.Error(codes.InvalidArgument, "failed to update personal data node status")
 	}
 
 	return &pbv1.AdminServiceSetPersonalDataNodeStatusResponse{Success: true}, nil
 }
 
-func (h *Handler) GetNetworkNodesList(ctx context.Context, _ *pbv1.AdminServiceGetNetworkNodesListRequest) (*pbv1.AdminServiceGetNetworkNodesListResponse, error) {
+func (h *Handler) GetNetworkNodesList(ctx context.Context, req *pbv1.AdminServiceGetNetworkNodesListRequest) (*pbv1.AdminServiceGetNetworkNodesListResponse, error) {
 	logger := h.customizeLogger(ctx, "GetNetworkNodesList")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	as, err := h.parseToken(ctx, logger, req.Token, lo.ToPtr(req.RemoteMacAddress), jwt.TokenScopeAccess)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("admin-id", as.AdminID))
+	nns, err := h.networkNodesService.GetList(ctx, logger, 0, converters.ConvertProtoPaginationToPagination(req.Pagination), false)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed get PDNs list, err=%v", err.Error())
+	}
+	data := make([]*pbv1.NetworkNode, 0, len(nns))
+	for _, nn := range nns {
+		data = append(data, converters.ConvertNetworkNodeToProtoNetworkNode(nn))
+	}
+
+	return &pbv1.AdminServiceGetNetworkNodesListResponse{
+		Data: data,
+	}, nil
 }
 
 func (h *Handler) GetNetworkNodeByID(ctx context.Context, _ *pbv1.AdminServiceGetNetworkNodeByIDRequest) (*pbv1.AdminServiceGetNetworkNodeByIDResponse, error) {

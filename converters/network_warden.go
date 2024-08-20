@@ -1,4 +1,4 @@
-package grpc
+package converters
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
-func convertHolderToProtoHolder(holder *models.Holder) *pbv1.Holder {
+func ConvertHolderToProtoHolder(holder *models.Holder) *pbv1.Holder {
 	var avatarImageURL *string
 	if holder.AvatarImageURL.Valid {
 		avatarImageURL = lo.ToPtr(holder.AvatarImageURL.String)
@@ -28,7 +28,20 @@ func convertHolderToProtoHolder(holder *models.Holder) *pbv1.Holder {
 	}
 }
 
-func convertProtoPaginationToPagination(p *v1.Pagination) *types.Pagination {
+func ConvertProtoPersonalDataNodeStatusToPersonalDataNodeStatus(status pbv1.PersonalDataNode_Status) models.PersonalDataNodeStatus {
+	switch status {
+	case pbv1.PersonalDataNode_STATUS_APPROVED:
+		return models.PersonalDataNodeStatusApproved
+	case pbv1.PersonalDataNode_STATUS_PENDING:
+		return models.PersonalDataNodeStatusPending
+	case pbv1.PersonalDataNode_STATUS_REJECTED:
+		return models.PersonalDataNodeStatusRejected
+	}
+
+	return ""
+}
+
+func ConvertProtoPaginationToPagination(p *v1.Pagination) *types.Pagination {
 	if p == nil {
 		return types.NewPagination(nil, nil)
 	}
@@ -36,7 +49,7 @@ func convertProtoPaginationToPagination(p *v1.Pagination) *types.Pagination {
 	return types.NewPagination(p.Limit, p.Offset)
 }
 
-func convertNetworkNodeToProtoNetworkNode(nn *models.NetworkNode) *pbv1.NetworkNode {
+func ConvertNetworkNodeToProtoNetworkNode(nn *models.NetworkNode) *pbv1.NetworkNode {
 	var lastPingedAt *string
 	if nn.LastPingedAt.Valid {
 		lastPingedAt = lo.ToPtr(formats.FormatDateTime(nn.LastPingedAt.Time))
@@ -58,7 +71,7 @@ func convertNetworkNodeToProtoNetworkNode(nn *models.NetworkNode) *pbv1.NetworkN
 		NwId:                 fmt.Sprint(nn.NetworkWardenID),
 		Name:                 nn.Name,
 		DomainName:           nn.DomainName,
-		Location:             convertLocationToProtoLocation(nn.Location),
+		Location:             ConvertLocationToProtoLocation(nn.Location),
 		AccountsCapacity:     nn.AccountsCapacity,
 		Alive:                nn.Alive,
 		LastPingedAt:         lastPingedAt,
@@ -67,11 +80,11 @@ func convertNetworkNodeToProtoNetworkNode(nn *models.NetworkNode) *pbv1.NetworkN
 		OwnerHolderId:        fmt.Sprint(nn.HolderID),
 		Url:                  nn.URL,
 		Version:              nn.Version,
-		RateLimit: convertRateLimitToProtoRateLimit(&types.RateLimit{
+		RateLimit: ConvertRateLimitToProtoRateLimit(&types.RateLimit{
 			MaxRequests: nn.RateLimitMaxRequests,
 			Interval:    nn.RateLimitInterval,
 		}),
-		CrawlRateLimit: convertRateLimitToProtoRateLimit(&types.RateLimit{
+		CrawlRateLimit: ConvertRateLimitToProtoRateLimit(&types.RateLimit{
 			MaxRequests: nn.CrawlRateLimitMaxRequests,
 			Interval:    nn.CrawlRateLimitInterval,
 		}),
@@ -79,7 +92,7 @@ func convertNetworkNodeToProtoNetworkNode(nn *models.NetworkNode) *pbv1.NetworkN
 	}
 }
 
-func convertPersonalDataNodeToProtoPersonalDataNode(pdn *models.PersonalDataNode) *pbv1.PersonalDataNode {
+func ConvertPersonalDataNodeToProtoPersonalDataNode(pdn *models.PersonalDataNode) *pbv1.PersonalDataNode {
 	var lastPingedAt string
 	if pdn.LastPingedAt.Valid {
 		lastPingedAt = formats.FormatDateTime(pdn.LastPingedAt.Time)
@@ -103,7 +116,7 @@ func convertPersonalDataNodeToProtoPersonalDataNode(pdn *models.PersonalDataNode
 		Label:                pdn.Label,
 		Name:                 pdn.Name,
 		Description:          pdn.Description,
-		Location:             convertLocationToProtoLocation(pdn.Location),
+		Location:             ConvertLocationToProtoLocation(pdn.Location),
 		AccountsCapacity:     pdn.AccountsCapacity,
 		Alive:                pdn.Alive,
 		LastPingedAt:         lastPingedAt,
@@ -112,11 +125,11 @@ func convertPersonalDataNodeToProtoPersonalDataNode(pdn *models.PersonalDataNode
 		OwnerHolderId:        fmt.Sprint(pdn.HolderID),
 		Url:                  pdn.URL,
 		Version:              pdn.Version,
-		RateLimit: convertRateLimitToProtoRateLimit(&types.RateLimit{
+		RateLimit: ConvertRateLimitToProtoRateLimit(&types.RateLimit{
 			MaxRequests: pdn.RateLimitMaxRequests,
 			Interval:    pdn.RateLimitInterval,
 		}),
-		CrawlRateLimit: convertRateLimitToProtoRateLimit(&types.RateLimit{
+		CrawlRateLimit: ConvertRateLimitToProtoRateLimit(&types.RateLimit{
 			MaxRequests: pdn.CrawlRateLimitMaxRequests,
 			Interval:    pdn.CrawlRateLimitInterval,
 		}),
@@ -124,7 +137,7 @@ func convertPersonalDataNodeToProtoPersonalDataNode(pdn *models.PersonalDataNode
 	}
 }
 
-func convertNetworkWardenToProtoNetworkWarden(nw *models.NetworkWarden) *pbv1.NetworkWarden {
+func ConvertNetworkWardenToProtoNetworkWarden(nw *models.NetworkWarden) *pbv1.NetworkWarden {
 	var lastPingedAt *string
 	if nw.LastPingedAt.Valid {
 		lastPingedAt = lo.ToPtr(formats.FormatDateTime(nw.LastPingedAt.Time))
@@ -141,17 +154,17 @@ func convertNetworkWardenToProtoNetworkWarden(nw *models.NetworkWarden) *pbv1.Ne
 		Address:        nw.Address,
 		PdnCapacity:    uint64(nw.PDNCapacity),
 		NnCapacity:     uint64(nw.NNCapacity),
-		Location:       convertLocationToProtoLocation(nw.Location),
+		Location:       ConvertLocationToProtoLocation(nw.Location),
 		IsOpen:         nw.IsOpen,
 		Url:            nw.URL,
 		Alive:          nw.Alive,
 		LastPingedAt:   lastPingedAt,
 		Version:        nw.Version,
-		RateLimit:      convertRateLimitToProtoRateLimit(&types.RateLimit{MaxRequests: nw.RateLimitMaxRequests, Interval: nw.RateLimitInterval}),
+		RateLimit:      ConvertRateLimitToProtoRateLimit(&types.RateLimit{MaxRequests: nw.RateLimitMaxRequests, Interval: nw.RateLimitInterval}),
 	}
 }
 
-func convertLocationToProtoLocation(l *models.Location) *v1.Geolocation {
+func ConvertLocationToProtoLocation(l *models.Location) *v1.Geolocation {
 	if l == nil {
 		return nil
 	}
@@ -161,7 +174,7 @@ func convertLocationToProtoLocation(l *models.Location) *v1.Geolocation {
 	}
 }
 
-func convertRateLimitToProtoRateLimit(rl *types.RateLimit) *v1.RateLimit {
+func ConvertRateLimitToProtoRateLimit(rl *types.RateLimit) *v1.RateLimit {
 	if rl == nil {
 		return nil
 	}
