@@ -252,11 +252,33 @@ func (h *Handler) GetPersonalDataNodesList(ctx context.Context, req *pbv1.AdminS
 	}, nil
 }
 
-func (h *Handler) GetPersonalDataNodeByID(ctx context.Context, _ *pbv1.AdminServiceGetPersonalDataNodeByIDRequest) (*pbv1.AdminServiceGetPersonalDataNodeByIDResponse, error) {
+func (h *Handler) GetPersonalDataNodeByID(ctx context.Context, req *pbv1.AdminServiceGetPersonalDataNodeByIDRequest) (*pbv1.AdminServiceGetPersonalDataNodeByIDResponse, error) {
 	logger := h.customizeLogger(ctx, "GetPersonalDataNodeByID")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	as, err := h.parseToken(ctx, logger, req.Token, lo.ToPtr(req.RemoteMacAddress), jwt.TokenScopeAccess)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("admin-id", as.AdminID))
+	pdnID, err := strconv.ParseInt(req.Id, 10, 64)
+	if err != nil {
+		logger.Error("invalid ID", zap.Error(err), zap.String("incoming-personal-data-node-id", req.Id))
+		return nil, status.Error(codes.InvalidArgument, "invalid ID")
+	}
+	pdn, err := h.personalDataNodesService.GetByID(ctx, logger, pdnID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed get PDN, err=%v", err.Error())
+	}
+	if pdn == nil {
+		return &pbv1.AdminServiceGetPersonalDataNodeByIDResponse{
+			Data: nil,
+		}, nil
+	}
+
+	return &pbv1.AdminServiceGetPersonalDataNodeByIDResponse{
+		Data: convertPersonalDataNodeToProtoPersonalDataNode(pdn),
+	}, nil
 }
 
 func (h *Handler) SetPersonalDataNodeStatus(ctx context.Context, _ *pbv1.AdminServiceSetPersonalDataNodeStatusRequest) (*pbv1.AdminServiceSetPersonalDataNodeStatusResponse, error) {

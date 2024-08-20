@@ -30,6 +30,7 @@ type Service interface {
 	Activate(ctx context.Context, logger *zap.Logger, holderID, id int64) (*models.PersonalDataNode, string, error)
 	Initiate(ctx context.Context, logger *zap.Logger, apiKey string, params *InitiateParams) error
 	GetList(ctx context.Context, logger *zap.Logger, holderID int64, pagination *types.Pagination, onlyMy bool) ([]*models.PersonalDataNode, error)
+	GetByID(ctx context.Context, logger *zap.Logger, id int64) (*models.PersonalDataNode, error)
 }
 
 type service struct {
@@ -211,4 +212,8 @@ func (s *service) GetList(ctx context.Context, logger *zap.Logger, holderID int6
 	}
 
 	return s.repo.GetPersonalDataNodesList(ctx, filters, pagination)
+}
+
+func (s *service) GetByID(ctx context.Context, logger *zap.Logger, id int64) (*models.PersonalDataNode, error) {
+	return s.repo.GetPersonalDataNodeByID(ctx, id)
 }
