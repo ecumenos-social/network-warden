@@ -407,9 +407,31 @@ func (h *Handler) GetNetworkWardensList(ctx context.Context, req *pbv1.AdminServ
 	}, nil
 }
 
-func (h *Handler) GetNetworkWardenByID(ctx context.Context, _ *pbv1.AdminServiceGetNetworkWardenByIDRequest) (*pbv1.AdminServiceGetNetworkWardenByIDResponse, error) {
+func (h *Handler) GetNetworkWardenByID(ctx context.Context, req *pbv1.AdminServiceGetNetworkWardenByIDRequest) (*pbv1.AdminServiceGetNetworkWardenByIDResponse, error) {
 	logger := h.customizeLogger(ctx, "GetNetworkWardenByID")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	as, err := h.parseToken(ctx, logger, req.Token, lo.ToPtr(req.RemoteMacAddress), jwt.TokenScopeAccess)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("admin-id", as.AdminID))
+	nwID, err := strconv.ParseInt(req.Id, 10, 64)
+	if err != nil {
+		logger.Error("invalid ID", zap.Error(err), zap.String("incoming-network-warden-id", req.Id))
+		return nil, status.Error(codes.InvalidArgument, "invalid ID")
+	}
+	nw, err := h.networkWardenService.GetByID(ctx, logger, nwID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed get NW, err=%v", err.Error())
+	}
+	if nw == nil {
+		return &pbv1.AdminServiceGetNetworkWardenByIDResponse{
+			Data: nil,
+		}, nil
+	}
+
+	return &pbv1.AdminServiceGetNetworkWardenByIDResponse{
+		Data: converters.ConvertNetworkWardenToProtoNetworkWarden(nw),
+	}, nil
 }
