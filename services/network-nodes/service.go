@@ -30,6 +30,8 @@ type Service interface {
 	Activate(ctx context.Context, logger *zap.Logger, holderID, id int64) (nn *models.NetworkNode, apiKey string, err error)
 	GetList(ctx context.Context, logger *zap.Logger, holderID int64, pagination *types.Pagination, onlyMy bool) ([]*models.NetworkNode, error)
 	Initiate(ctx context.Context, logger *zap.Logger, apiKey string, params *InitiateParams) error
+	GetByID(ctx context.Context, logger *zap.Logger, id int64) (*models.NetworkNode, error)
+	SetStatusByID(ctx context.Context, logger *zap.Logger, id int64, status models.NetworkNodeStatus) error
 }
 
 type service struct {
@@ -199,4 +201,23 @@ func (s *service) GetList(ctx context.Context, logger *zap.Logger, holderID int6
 	}
 
 	return s.repo.GetNetworkNodesList(ctx, filters, pagination)
+}
+
+func (s *service) GetByID(ctx context.Context, logger *zap.Logger, id int64) (*models.NetworkNode, error) {
+	return s.repo.GetNetworkNodeByID(ctx, id)
+}
+
+func (s *service) SetStatusByID(ctx context.Context, logger *zap.Logger, id int64, status models.NetworkNodeStatus) error {
+	nn, err := s.repo.GetNetworkNodeByID(ctx, id)
+	if err != nil {
+		logger.Error("failed to get network node by id", zap.Error(err), zap.Int64("network-node-id", id))
+		return err
+	}
+	nn.Status = status
+	if err := s.repo.ModifyNetworkNode(ctx, nn.ID, nn); err != nil {
+		logger.Error("failed to modify network node", zap.Error(err), zap.Int64("network-node-id", nn.ID))
+		return errorwrapper.New("failed to modify network node")
+	}
+
+	return nil
 }

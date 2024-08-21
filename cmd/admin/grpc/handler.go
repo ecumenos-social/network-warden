@@ -330,18 +330,54 @@ func (h *Handler) GetNetworkNodesList(ctx context.Context, req *pbv1.AdminServic
 	}, nil
 }
 
-func (h *Handler) GetNetworkNodeByID(ctx context.Context, _ *pbv1.AdminServiceGetNetworkNodeByIDRequest) (*pbv1.AdminServiceGetNetworkNodeByIDResponse, error) {
+func (h *Handler) GetNetworkNodeByID(ctx context.Context, req *pbv1.AdminServiceGetNetworkNodeByIDRequest) (*pbv1.AdminServiceGetNetworkNodeByIDResponse, error) {
 	logger := h.customizeLogger(ctx, "GetNetworkNodeByID")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	as, err := h.parseToken(ctx, logger, req.Token, lo.ToPtr(req.RemoteMacAddress), jwt.TokenScopeAccess)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("admin-id", as.AdminID))
+	nnID, err := strconv.ParseInt(req.Id, 10, 64)
+	if err != nil {
+		logger.Error("invalid ID", zap.Error(err), zap.String("incoming-network-node-id", req.Id))
+		return nil, status.Error(codes.InvalidArgument, "invalid ID")
+	}
+	nn, err := h.networkNodesService.GetByID(ctx, logger, nnID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed get NN, err=%v", err.Error())
+	}
+	if nn == nil {
+		return &pbv1.AdminServiceGetNetworkNodeByIDResponse{
+			Data: nil,
+		}, nil
+	}
+
+	return &pbv1.AdminServiceGetNetworkNodeByIDResponse{
+		Data: converters.ConvertNetworkNodeToProtoNetworkNode(nn),
+	}, nil
 }
 
-func (h *Handler) SetNetworkNodeStatus(ctx context.Context, _ *pbv1.AdminServiceSetNetworkNodeStatusRequest) (*pbv1.AdminServiceSetNetworkNodeStatusResponse, error) {
+func (h *Handler) SetNetworkNodeStatus(ctx context.Context, req *pbv1.AdminServiceSetNetworkNodeStatusRequest) (*pbv1.AdminServiceSetNetworkNodeStatusResponse, error) {
 	logger := h.customizeLogger(ctx, "SetNetworkNodeStatus")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	as, err := h.parseToken(ctx, logger, req.Token, lo.ToPtr(req.RemoteMacAddress), jwt.TokenScopeAccess)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("admin-id", as.AdminID))
+	pdnID, err := strconv.ParseInt(req.Id, 10, 64)
+	if err != nil {
+		logger.Error("invalid ID", zap.Error(err), zap.String("incoming-network-node-id", req.Id))
+		return nil, status.Error(codes.InvalidArgument, "invalid ID")
+	}
+	if err := h.networkNodesService.SetStatusByID(ctx, logger, pdnID, converters.ConvertProtoNetworkNodeStatusToNetworkNodeStatus(req.Status)); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "failed to update network node status")
+	}
+
+	return &pbv1.AdminServiceSetNetworkNodeStatusResponse{Success: true}, nil
 }
 
 func (h *Handler) GetNetworkWardensList(ctx context.Context, _ *pbv1.AdminServiceGetNetworkWardensListRequest) (*pbv1.AdminServiceGetNetworkWardensListResponse, error) {
