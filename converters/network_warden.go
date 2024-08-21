@@ -41,6 +41,19 @@ func ConvertProtoPersonalDataNodeStatusToPersonalDataNodeStatus(status pbv1.Pers
 	return ""
 }
 
+func ConvertProtoNetworkNodeStatusToNetworkNodeStatus(status pbv1.NetworkNode_Status) models.NetworkNodeStatus {
+	switch status {
+	case pbv1.NetworkNode_STATUS_APPROVED:
+		return models.NetworkNodeStatusApproved
+	case pbv1.NetworkNode_STATUS_PENDING:
+		return models.NetworkNodeStatusPending
+	case pbv1.NetworkNode_STATUS_REJECTED:
+		return models.NetworkNodeStatusRejected
+	}
+
+	return ""
+}
+
 func ConvertProtoPaginationToPagination(p *v1.Pagination) *types.Pagination {
 	if p == nil {
 		return types.NewPagination(nil, nil)
