@@ -187,6 +187,26 @@ func ConvertLocationToProtoLocation(l *models.Location) *v1.Geolocation {
 	}
 }
 
+func ConvertProtoLocationToLocation(l *v1.Geolocation) *models.Location {
+	if l == nil {
+		return nil
+	}
+	return &models.Location{
+		Latitude:  l.Latitude,
+		Longitude: l.Longitude,
+	}
+}
+
+func ConvertProtoRateLimitToRateLimit(rl *v1.RateLimit) *types.RateLimit {
+	if rl == nil {
+		return nil
+	}
+	return &types.RateLimit{
+		MaxRequests: rl.MaxRequests,
+		Interval:    rl.Interval.AsDuration(),
+	}
+}
+
 func ConvertRateLimitToProtoRateLimit(rl *types.RateLimit) *v1.RateLimit {
 	if rl == nil {
 		return nil

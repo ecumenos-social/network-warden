@@ -19,7 +19,6 @@ import (
 	personaldatanodes "github.com/ecumenos-social/network-warden/services/personal-data-nodes"
 	smssender "github.com/ecumenos-social/network-warden/services/sms-sender"
 	pbv1 "github.com/ecumenos-social/schemas/proto/gen/networkwarden/v1"
-	"github.com/ecumenos-social/toolkit/types"
 	"github.com/ecumenos-social/toolkit/validators"
 	"github.com/ecumenos-social/toolkitfx"
 	"go.uber.org/fx"
@@ -608,11 +607,8 @@ func (h *Handler) JoinPersonalDataNodeRegistrationWaitlist(ctx context.Context, 
 		Name:            req.Name,
 		Description:     req.Description,
 		Label:           req.Label,
-		Location: &models.Location{
-			Longitude: req.Location.Longitude,
-			Latitude:  req.Location.Latitude,
-		},
-		URL: req.Url,
+		Location:        converters.ConvertProtoLocationToLocation(req.Location),
+		URL:             req.Url,
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to insert personal data node, err = %v", err.Error())
@@ -660,15 +656,9 @@ func (h *Handler) InitiatePersonalDataNode(ctx context.Context, req *pbv1.Networ
 		IsOpen:               req.IsOpen,
 		IsInviteCodeRequired: req.IsInviteCodeRequired,
 		Version:              req.Version,
-		RateLimit: &types.RateLimit{
-			MaxRequests: req.RateLimit.MaxRequests,
-			Interval:    req.RateLimit.Interval.AsDuration(),
-		},
-		CrawlRateLimit: &types.RateLimit{
-			MaxRequests: req.CrawlRateLimit.MaxRequests,
-			Interval:    req.CrawlRateLimit.Interval.AsDuration(),
-		},
-		IDGenNode: req.IdGenNode,
+		RateLimit:            converters.ConvertProtoRateLimitToRateLimit(req.RateLimit),
+		CrawlRateLimit:       converters.ConvertProtoRateLimitToRateLimit(req.CrawlRateLimit),
+		IDGenNode:            req.IdGenNode,
 	}
 	if err := h.personalDataNodesService.Initiate(ctx, logger, req.ApiKey, params); err != nil {
 		logger.Error("failed to initiate", zap.Error(err), zap.String("incoming-personal-data-node-api-key", req.ApiKey))
@@ -738,11 +728,8 @@ func (h *Handler) JoinNetworkNodeRegistrationWaitlist(ctx context.Context, req *
 		Name:            req.Name,
 		Description:     req.Description,
 		DomainName:      req.DomainName,
-		Location: &models.Location{
-			Longitude: req.Location.Longitude,
-			Latitude:  req.Location.Latitude,
-		},
-		URL: req.Url,
+		Location:        converters.ConvertProtoLocationToLocation(req.Location),
+		URL:             req.Url,
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to insert network node, err = %v", err.Error())
@@ -790,15 +777,9 @@ func (h *Handler) InitiateNetworkNode(ctx context.Context, req *pbv1.NetworkWard
 		IsOpen:               req.IsOpen,
 		IsInviteCodeRequired: req.IsInviteCodeRequired,
 		Version:              req.Version,
-		RateLimit: &types.RateLimit{
-			MaxRequests: req.RateLimit.MaxRequests,
-			Interval:    req.RateLimit.Interval.AsDuration(),
-		},
-		CrawlRateLimit: &types.RateLimit{
-			MaxRequests: req.CrawlRateLimit.MaxRequests,
-			Interval:    req.CrawlRateLimit.Interval.AsDuration(),
-		},
-		IDGenNode: req.IdGenNode,
+		RateLimit:            converters.ConvertProtoRateLimitToRateLimit(req.RateLimit),
+		CrawlRateLimit:       converters.ConvertProtoRateLimitToRateLimit(req.CrawlRateLimit),
+		IDGenNode:            req.IdGenNode,
 	}
 	if err := h.networkNodesService.Initiate(ctx, logger, req.ApiKey, params); err != nil {
 		logger.Error("failed to initiate", zap.Error(err), zap.String("incoming-network-node-api-key", req.ApiKey))
@@ -835,24 +816,22 @@ func (h *Handler) RegisterNetworkWarden(ctx context.Context, req *pbv1.NetworkWa
 	logger := h.customizeLogger(ctx, "RegisterNetworkWarden")
 	defer logger.Info("request processed")
 
+	if req.Location == nil {
+		logger.Error("validation error. Location is required", zap.Any("request-body", req))
+		return nil, status.Error(codes.InvalidArgument, "validation error. Location is required")
+	}
 	params := &networkwardens.InsertParams{
 		Name:        req.Name,
 		Description: req.Description,
 		Label:       req.Label,
-		Location: &models.Location{
-			Longitude: req.Location.Longitude,
-			Latitude:  req.Location.Latitude,
-		},
+		Location:    converters.ConvertProtoLocationToLocation(req.Location),
 		IsOpen:      req.IsOpen,
 		Version:     req.Version,
 		URL:         req.Url,
 		PDNCapacity: int64(req.PdnCapacity),
 		NNCapacity:  int64(req.NnCapacity),
-		RateLimit: &types.RateLimit{
-			MaxRequests: req.RateLimit.MaxRequests,
-			Interval:    req.RateLimit.Interval.AsDuration(),
-		},
-		IDGenNode: req.IdGenNode,
+		RateLimit:   converters.ConvertProtoRateLimitToRateLimit(req.RateLimit),
+		IDGenNode:   req.IdGenNode,
 	}
 	if _, err := h.networkWardensService.Insert(ctx, logger, params); err != nil {
 		logger.Error("failed to register", zap.Error(err), zap.Any("request-body", req))

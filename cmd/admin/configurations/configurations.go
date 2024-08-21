@@ -25,6 +25,7 @@ type fxConfig struct {
 	AdminsIDGenerator            *idgenerators.AdminsIDGeneratorConfig
 	PersonalDataNodesIDGenerator *idgenerators.PersonalDataNodesIDGeneratorConfig
 	NetworkNodesIDGenerator      *idgenerators.NetworkNodesIDGeneratorConfig
+	NetworkWardensIDGenerator    *idgenerators.NetworkWardensIDGeneratorConfig
 	JWT                          *jwt.Config
 	Auth                         *adminauth.Config
 }
@@ -88,6 +89,10 @@ var Module = func(cctx *cli.Context) fx.Option {
 					LowNodeID: 0,
 				},
 				NetworkNodesIDGenerator: &idgenerators.NetworkNodesIDGeneratorConfig{
+					TopNodeID: cctx.Int64("nw-app-id-gen-node"),
+					LowNodeID: 0,
+				},
+				NetworkWardensIDGenerator: &idgenerators.NetworkWardensIDGeneratorConfig{
 					TopNodeID: cctx.Int64("nw-app-id-gen-node"),
 					LowNodeID: 0,
 				},

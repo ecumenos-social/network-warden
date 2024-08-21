@@ -13,6 +13,7 @@ import (
 	"github.com/ecumenos-social/network-warden/services/admins"
 	"github.com/ecumenos-social/network-warden/services/jwt"
 	networknodes "github.com/ecumenos-social/network-warden/services/network-nodes"
+	networkwardens "github.com/ecumenos-social/network-warden/services/network-wardens"
 	personaldatanodes "github.com/ecumenos-social/network-warden/services/personal-data-nodes"
 	pbv1 "github.com/ecumenos-social/schemas/proto/gen/networkwarden/v1"
 	"github.com/samber/lo"
@@ -32,6 +33,7 @@ type Handler struct {
 	logger                   *zap.Logger
 	personalDataNodesService personaldatanodes.Service
 	networkNodesService      networknodes.Service
+	networkWardenService     networkwardens.Service
 }
 
 var _ pbv1.AdminServiceServer = (*Handler)(nil)
@@ -45,6 +47,7 @@ type handlerParams struct {
 	Logger                   *zap.Logger
 	PersonalDataNodesService personaldatanodes.Service
 	NetworkNodesService      networknodes.Service
+	NetworkWardenService     networkwardens.Service
 }
 
 func NewHandler(params handlerParams) *Handler {
@@ -54,6 +57,7 @@ func NewHandler(params handlerParams) *Handler {
 		auth:                     params.AdminSessionsService,
 		personalDataNodesService: params.PersonalDataNodesService,
 		networkNodesService:      params.NetworkNodesService,
+		networkWardenService:     params.NetworkWardenService,
 
 		logger: params.Logger,
 	}
@@ -380,11 +384,27 @@ func (h *Handler) SetNetworkNodeStatus(ctx context.Context, req *pbv1.AdminServi
 	return &pbv1.AdminServiceSetNetworkNodeStatusResponse{Success: true}, nil
 }
 
-func (h *Handler) GetNetworkWardensList(ctx context.Context, _ *pbv1.AdminServiceGetNetworkWardensListRequest) (*pbv1.AdminServiceGetNetworkWardensListResponse, error) {
+func (h *Handler) GetNetworkWardensList(ctx context.Context, req *pbv1.AdminServiceGetNetworkWardensListRequest) (*pbv1.AdminServiceGetNetworkWardensListResponse, error) {
 	logger := h.customizeLogger(ctx, "GetNetworkWardensList")
 	defer logger.Info("request processed")
 
-	return nil, status.Errorf(codes.Unimplemented, "method is not implemented")
+	as, err := h.parseToken(ctx, logger, req.Token, lo.ToPtr(req.RemoteMacAddress), jwt.TokenScopeAccess)
+	if err != nil {
+		return nil, err
+	}
+	logger = logger.With(zap.Int64("admin-id", as.AdminID))
+	nws, err := h.networkWardenService.GetList(ctx, logger, converters.ConvertProtoPaginationToPagination(req.Pagination))
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed get NWs list, err=%v", err.Error())
+	}
+	data := make([]*pbv1.NetworkWarden, 0, len(nws))
+	for _, nw := range nws {
+		data = append(data, converters.ConvertNetworkWardenToProtoNetworkWarden(nw))
+	}
+
+	return &pbv1.AdminServiceGetNetworkWardensListResponse{
+		Data: data,
+	}, nil
 }
 
 func (h *Handler) GetNetworkWardenByID(ctx context.Context, _ *pbv1.AdminServiceGetNetworkWardenByIDRequest) (*pbv1.AdminServiceGetNetworkWardenByIDResponse, error) {
